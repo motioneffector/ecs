@@ -239,16 +239,34 @@ describe('ECS - Complete Test Suite', () => {
       it('adds entry to entities table', () => {
         const id = ecs.createEntity()
         const runSpy = vi.spyOn(db, 'run')
-        ecs.createEntity()
+        const newId = ecs.createEntity()
+        // Verify run was called with INSERT INTO entities
         expect(runSpy).toHaveBeenCalled()
+        const insertCalls = runSpy.mock.calls.filter(call =>
+          typeof call[0] === 'string' && call[0].includes('INSERT INTO entities')
+        )
+        expect(insertCalls.length).toBeGreaterThan(0)
       })
 
       it('stores created_at timestamp', () => {
         const before = Date.now()
-        ecs.createEntity()
+        const id = ecs.createEntity()
         const after = Date.now()
-        // Verify timestamp is reasonable (we can't check exact value in mock)
-        expect(after).toBeGreaterThanOrEqual(before)
+
+        // Verify timestamp was passed to database
+        const runSpy = vi.spyOn(db, 'run')
+        const id2 = ecs.createEntity()
+        const call = runSpy.mock.calls.find(c =>
+          typeof c[0] === 'string' && c[0].includes('INSERT INTO entities')
+        )
+        expect(call).toBeDefined()
+        expect(call![1]).toBeInstanceOf(Array)
+        const params = call![1] as unknown[]
+        expect(params.length).toBeGreaterThanOrEqual(2)
+        // Second parameter should be timestamp
+        expect(typeof params[1]).toBe('number')
+        expect(params[1]).toBeGreaterThanOrEqual(before)
+        expect(params[1]).toBeLessThanOrEqual(after)
       })
     })
 

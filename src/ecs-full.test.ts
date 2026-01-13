@@ -19,9 +19,17 @@ function createTestDatabase(): Database {
   // Helper to extract field names from INSERT statement
   function extractFieldNames(sql: string): string[] {
     // Match: INSERT INTO tablename (entity_id, field1, field2, ...) VALUES ...
-    const match = sql.match(/INSERT INTO \w+\s*\(([^)]+)\)/)
+    // Handle both quoted and unquoted table names
+    const match = sql.match(/INSERT INTO "?\w+"?\s*\(([^)]+)\)/)
     if (match) {
-      return match[1].split(',').map(f => f.trim())
+      return match[1].split(',').map(f => {
+        const trimmed = f.trim()
+        // Remove surrounding quotes if present (e.g., "entity_id" -> entity_id)
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+          return trimmed.slice(1, -1).replace(/""/g, '"') // Also unescape doubled quotes
+        }
+        return trimmed
+      })
     }
     return []
   }
@@ -33,8 +41,13 @@ function createTestDatabase(): Database {
     if (match) {
       const setClause = match[1]
       return setClause.split(',').map(part => {
-        const fieldMatch = part.trim().match(/^(\w+)\s*=/)
-        return fieldMatch ? fieldMatch[1] : ''
+        // Match either quoted or unquoted identifiers
+        const fieldMatch = part.trim().match(/^"([^"]+)"\s*=|^(\w+)\s*=/)
+        if (fieldMatch) {
+          // Return the first capturing group that matched (quoted or unquoted)
+          return fieldMatch[1] || fieldMatch[2]
+        }
+        return ''
       }).filter(Boolean)
     }
     return []
@@ -58,8 +71,9 @@ function createTestDatabase(): Database {
       }
 
       // INSERT INTO component tables
-      if (sqlStr.includes('INSERT INTO component_')) {
-        const tableMatch = sqlStr.match(/INSERT INTO (component_\w+)/)
+      if (sqlStr.includes('INSERT INTO component_') || sqlStr.includes('INSERT INTO "component_')) {
+        // Match either quoted or unquoted table names
+        const tableMatch = sqlStr.match(/INSERT INTO "?(component_\w+)"?/)
         if (tableMatch) {
           const tableName = tableMatch[1]
           if (!componentTables.has(tableName)) {
@@ -98,8 +112,8 @@ function createTestDatabase(): Database {
       }
 
       // DELETE FROM component tables
-      if (sqlStr.includes('DELETE FROM component_')) {
-        const match = sqlStr.match(/DELETE FROM (component_\w+)/)
+      if (sqlStr.includes('DELETE FROM component_') || sqlStr.includes('DELETE FROM "component_')) {
+        const match = sqlStr.match(/DELETE FROM "?(component_\w+)"?/)
         if (match) {
           const tableName = match[1]
           const table = componentTables.get(tableName)
@@ -113,8 +127,8 @@ function createTestDatabase(): Database {
       }
 
       // UPDATE component tables
-      if (sqlStr.includes('UPDATE component_')) {
-        const match = sqlStr.match(/UPDATE (component_\w+)/)
+      if (sqlStr.includes('UPDATE component_') || sqlStr.includes('UPDATE "component_')) {
+        const match = sqlStr.match(/UPDATE "?(component_\w+)"?/)
         if (match) {
           const tableName = match[1]
           const table = componentTables.get(tableName)
@@ -155,8 +169,8 @@ function createTestDatabase(): Database {
       }
 
       // SELECT FROM component tables
-      if (sqlStr.includes('FROM component_')) {
-        const match = sqlStr.match(/FROM (component_\w+)/)
+      if (sqlStr.includes('FROM component_') || sqlStr.includes('FROM "component_')) {
+        const match = sqlStr.match(/FROM "?(component_\w+)"?/)
         if (match) {
           const tableName = match[1]
           const table = componentTables.get(tableName)
@@ -205,9 +219,10 @@ function createTestDatabase(): Database {
 
             // Handle WHERE clause with parameters
             if (sqlStr.includes('WHERE') && paramsArray.length > 0) {
-              const whereMatch = sqlStr.match(/WHERE\s+(\w+)\s*=\s*\?/)
+              // Match either quoted or unquoted identifiers in WHERE clause
+              const whereMatch = sqlStr.match(/WHERE\s+"([^"]+)"\s*=\s*\?|WHERE\s+(\w+)\s*=\s*\?/)
               if (whereMatch) {
-                const fieldName = whereMatch[1]
+                const fieldName = whereMatch[1] || whereMatch[2]
                 const fieldValue = paramsArray[0]
                 results = results.filter(row => row[fieldName] === fieldValue)
               }
@@ -945,6 +960,18 @@ describe('ecs.query()', () => {
       const spy = vi.spyOn(db, 'all')
       ecs.query([Position, Velocity])
       expect(spy).toHaveBeenCalled()
+
+      // Verify the SQL uses JOIN for multiple components
+      const calls = spy.mock.calls
+      const queryCalls = calls.filter(call => {
+        const sql = typeof call[0] === 'string' ? call[0] : (call[0] as any).sql
+        return sql && typeof sql === 'string' && sql.includes('component_position') && sql.includes('component_velocity')
+      })
+      expect(queryCalls.length).toBeGreaterThan(0)
+
+      // Check that JOIN is used (not separate queries)
+      const sql = typeof queryCalls[0][0] === 'string' ? queryCalls[0][0] : (queryCalls[0][0] as any).sql
+      expect(sql.toUpperCase()).toMatch(/JOIN/)
     })
   })
 })
@@ -1232,15 +1259,19 @@ describe('Bulk Operations', () => {
       const id2 = ecs.createEntity()
       ecs.addComponent(id1, Position, { x: 0, y: 0, room_id: 'test' })
 
-      // Call bulk operation - it will trigger an error on duplicate
-      // The transaction will roll back
-      ecs.addComponentBulk([id1, id2], Position, { x: 5, y: 5, room_id: 'test' })
+      // Bulk operation should fail due to duplicate on id1
+      // Transaction should roll back, so id2 shouldn't get the component
+      try {
+        await ecs.addComponentBulk([id1, id2], Position, { x: 5, y: 5, room_id: 'test' })
+      } catch (error) {
+        // Expected to fail
+      }
 
-      // Wait for async operation to complete
-      await new Promise(resolve => setTimeout(resolve, 10))
-
-      // id2 should not have component if transaction rolled back
+      // id2 should not have component since transaction rolled back
       expect(ecs.hasComponent(id2, Position)).toBe(false)
+      // id1 should still have original component
+      const pos1 = ecs.getComponent(id1, Position)
+      expect(pos1?.x).toBe(0)
     })
 
     it('fires events for each entity', () => {
