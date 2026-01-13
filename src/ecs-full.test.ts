@@ -208,7 +208,7 @@ function createTestDatabase(): Database {
         return Array.from(entities.values()) as T[]
       }
 
-      // SELECT from a single component table with WHERE clause
+      // SELECT from a single component table (with or without WHERE clause)
       if (sqlStr.includes('SELECT') && sqlStr.includes('FROM component_') && !sqlStr.includes('JOIN')) {
         const match = sqlStr.match(/FROM (component_\w+)/)
         if (match) {
@@ -226,6 +226,12 @@ function createTestDatabase(): Database {
                 const fieldValue = paramsArray[0]
                 results = results.filter(row => row[fieldName] === fieldValue)
               }
+            }
+
+            // Check if SELECT is requesting only entity_id (for query() method)
+            // Pattern: SELECT t0."entity_id" FROM ...
+            if (sqlStr.match(/SELECT\s+\w+\."?entity_id"?/)) {
+              return results.map(row => ({ entity_id: row.entity_id })) as T[]
             }
 
             return results as T[]
@@ -257,19 +263,8 @@ function createTestDatabase(): Database {
           }
         }
 
-        return Array.from(entityIds).map(id => {
-          const result: Record<string, unknown> = { entity_id: id }
-          for (const tableName of tableNames) {
-            const table = componentTables.get(tableName)
-            if (table) {
-              const data = table.get(id)
-              if (data) {
-                Object.assign(result, data)
-              }
-            }
-          }
-          return result as T
-        })
+        // Return only entity_id as the SQL SELECT statement requests
+        return Array.from(entityIds).map(id => ({ entity_id: id }) as T)
       }
 
       return []
