@@ -72,13 +72,15 @@ describe('createECS()', () => {
       const db = createMockDatabase()
       const Position = defineComponent('position', { x: 'number', y: 'number' })
       const ecs = createECS(db, [Position])
-      expect(ecs).toBeDefined()
+      expect(typeof ecs).toBe('object')
+      expect(ecs).toHaveProperty('initialize')
     })
 
     it('accepts empty components array', () => {
       const db = createMockDatabase()
       const ecs = createECS(db, [])
-      expect(ecs).toBeDefined()
+      expect(typeof ecs).toBe('object')
+      expect(ecs).toHaveProperty('initialize')
     })
 
     it('returns object with all expected methods', () => {

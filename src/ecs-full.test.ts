@@ -8,6 +8,7 @@ import type { Database } from '@motioneffector/sql'
 function createTestDatabase(): Database {
   const entities = new Map<string, { id: string; created_at: number }>()
   const componentTables = new Map<string, Map<string, Record<string, unknown>>>()
+  const indexes = new Map<string, string[]>() // tableName -> indexNames
   let sqlLog: string[] = []
   let inTx = false
   let txSnapshot: {
@@ -181,6 +182,13 @@ function createTestDatabase(): Database {
         throw new Error(`Invalid SQL syntax: ${sqlStr}`)
       }
 
+      // Aggregate/COUNT queries (check before generic SELECT)
+      if (sqlStr.includes('COUNT(*)')) {
+        if (sqlStr.includes('FROM entities')) {
+          return [{ count: entities.size } as T]
+        }
+      }
+
       // SELECT * FROM entities
       if (sqlStr.includes('SELECT') && sqlStr.includes('FROM entities') && !sqlStr.includes('JOIN')) {
         return Array.from(entities.values()) as T[]
@@ -249,18 +257,25 @@ function createTestDatabase(): Database {
         })
       }
 
-      // Aggregate/COUNT queries
-      if (sqlStr.includes('COUNT(*)')) {
-        if (sqlStr.includes('FROM entities')) {
-          return [{ count: entities.size } as T]
-        }
-      }
-
       return []
     },
 
     exec: (sql: string) => {
       sqlLog.push(sql)
+      // Track index creation
+      const indexMatch = sql.match(/CREATE INDEX\s+(?:IF NOT EXISTS\s+)?(\w+)\s+ON\s+(\w+)/)
+      if (indexMatch) {
+        const [, indexName, tableName] = indexMatch
+        if (indexName && tableName) {
+          if (!indexes.has(tableName)) {
+            indexes.set(tableName, [])
+          }
+          const tableIndexes = indexes.get(tableName)
+          if (tableIndexes && !tableIndexes.includes(indexName)) {
+            tableIndexes.push(indexName)
+          }
+        }
+      }
     },
 
     migrate: async (migrations: unknown[]) => [],
@@ -319,7 +334,19 @@ function createTestDatabase(): Database {
     load: async () => {},
     getTables: () => Array.from(componentTables.keys()),
     getTableInfo: (tableName: string) => [],
-    getIndexes: (tableName?: string) => [],
+    getIndexes: (tableName?: string) => {
+      if (tableName) {
+        return indexes.get(tableName)?.map(name => ({ name, tableName, columns: [] })) ?? []
+      }
+      // Return all indexes if no table specified
+      const allIndexes: Array<{ name: string; tableName: string; columns: string[] }> = []
+      for (const [table, indexNames] of indexes.entries()) {
+        for (const name of indexNames) {
+          allIndexes.push({ name, tableName: table, columns: [] })
+        }
+      }
+      return allIndexes
+    },
     close: () => {},
     clone: async () => createTestDatabase(),
     clear: () => {
@@ -366,7 +393,7 @@ describe('ecs.addComponent()', () => {
       const id = ecs.createEntity()
       ecs.addComponent(id, Position, { x: 10, y: 20, room_id: 'test' })
       const pos = ecs.getComponent(id, Position)
-      expect(pos).toBeDefined()
+      expect(pos).toEqual({ x: 10, y: 20, room_id: 'test' })
     })
 
     it('stores all schema fields', () => {
@@ -418,7 +445,7 @@ describe('ecs.addComponent()', () => {
       const items = [{ name: 'sword', damage: 10 }]
       ecs.addComponent(id, Inventory, { capacity: 20, items })
       const inv = ecs.getComponent(id, Inventory)
-      expect(inv).toBeDefined()
+      expect(inv).toEqual({ capacity: 20, items })
     })
 
     it('retrieves json values as parsed objects', () => {
@@ -1009,7 +1036,8 @@ describe('ecs.rawQuery()', () => {
       ecs.addComponent(id, Position, { x: 10, y: 20, room_id: 'test' })
 
       const results = ecs.rawQuery('SELECT * FROM component_position')
-      expect(results).toBeDefined()
+      expect(Array.isArray(results)).toBe(true)
+      expect(results.length).toBe(1)
     })
 
     it('returns result rows', () => {
@@ -1025,7 +1053,8 @@ describe('ecs.rawQuery()', () => {
       ecs.addComponent(id, Position, { x: 10, y: 20, room_id: 'test' })
 
       const results = ecs.rawQuery('SELECT * FROM component_position WHERE x = ?', [10])
-      expect(results).toBeDefined()
+      expect(Array.isArray(results)).toBe(true)
+      expect(results.length).toBe(1)
     })
 
     it('handles SELECT queries', () => {
@@ -1038,7 +1067,9 @@ describe('ecs.rawQuery()', () => {
       ecs.createEntity()
 
       const results = ecs.rawQuery('SELECT COUNT(*) as count FROM entities')
-      expect(results).toBeDefined()
+      expect(Array.isArray(results)).toBe(true)
+      expect(results[0]).toHaveProperty('count')
+      expect(results[0].count).toBe(2)
     })
   })
 
@@ -1046,7 +1077,7 @@ describe('ecs.rawQuery()', () => {
     it('throws DatabaseError for invalid SQL', () => {
       expect(() => {
         ecs.rawQuery('INVALID SQL SYNTAX')
-      }).toThrow()
+      }).toThrow(DatabaseError)
     })
   })
 })
@@ -1458,7 +1489,8 @@ describe('Archetypes', () => {
   describe('defineArchetype()', () => {
     it('creates archetype from component list', () => {
       const archetype = ecs.defineArchetype([Position, Health])
-      expect(archetype).toBeDefined()
+      expect(archetype).toHaveProperty('components')
+      expect(archetype.components).toEqual([Position, Health])
     })
 
     it('validates all components exist', () => {
@@ -1581,7 +1613,8 @@ describe('ecs.addIndex()', () => {
     it('index persists across restarts', () => {
       ecs.addIndex(Position, 'x')
       const indexes = db.getIndexes('component_position')
-      expect(indexes).toBeDefined()
+      expect(Array.isArray(indexes)).toBe(true)
+      expect(indexes.length).toBeGreaterThan(0)
     })
   })
 

@@ -444,13 +444,13 @@ Comprehensive test suite for the SQL-backed Entity Component System. Covers enti
 
 ## Summary
 
-Total test cases: 266
+Total test cases: 181
 
 - defineComponent: 11 tests
-- createECS: 5 tests
+- createECS: 6 tests
 - ecs.initialize: 13 tests
 - ecs.createEntity: 9 tests
-- ecs.destroyEntity: 5 tests
+- ecs.destroyEntity: 6 tests
 - ecs.addComponent: 16 tests
 - ecs.getComponent: 8 tests
 - ecs.updateComponent: 15 tests
@@ -458,12 +458,12 @@ Total test cases: 266
 - ecs.hasComponent: 3 tests
 - ecs.query: 10 tests
 - ecs.queryWithData: 6 tests
-- ecs.rawQuery: 5 tests
+- ecs.rawQuery: 6 tests
 - ecs.transaction: 9 tests
 - Bulk Operations: 7 tests
 - Event System: 18 tests
 - Archetypes: 8 tests
-- ecs.addIndex: 5 tests
+- ecs.addIndex: 6 tests
 - ecs.getDatabase: 2 tests
 - Integration Tests: 6 tests
 - Edge Cases: 11 tests
