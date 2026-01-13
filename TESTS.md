@@ -442,18 +442,233 @@ Comprehensive test suite for the SQL-backed Entity Component System. Covers enti
 
 ---
 
+## Advanced Validation Tests
+
+### SQL Injection Prevention
+
+✓ escapes SQL keywords in component names
+✓ handles component name "SELECT"
+✓ handles component name "WHERE"
+✓ handles component name "DROP"
+✓ handles component name "DELETE"
+✓ handles field name with SQL keywords
+✓ handles entity id with SQL injection attempt
+
+### Special Characters
+
+✓ handles component name with spaces
+✓ handles component name with hyphens
+✓ handles component name with underscores
+✓ handles field name with special characters
+✓ handles backticks in component names
+✓ handles quotes in component names
+
+### Length Limits
+
+✓ handles very long entity id (1000 chars)
+✓ handles very long string field value (10MB)
+✓ handles component name at boundary length
+✓ handles entity id with only whitespace gets trimmed
+
+### Null and Undefined Handling
+
+✓ throws ValidationError for null component definition
+✓ throws ValidationError for undefined component definition
+✓ throws ValidationError for null entity id
+✓ throws ValidationError for undefined field value
+✓ distinguishes between null and undefined in json fields
+
+---
+
+## Error Message Validation
+
+### defineComponent Errors
+
+✓ ValidationError includes field name for empty name
+✓ ValidationError includes field name for invalid type
+✓ ValidationError message is descriptive for reserved field
+
+### Entity Operation Errors
+
+✓ ValidationError for non-existent entity includes entity id
+✓ ValidationError for duplicate id includes the id value
+✓ ValidationError message explains why operation failed
+
+### Component Operation Errors
+
+✓ ValidationError for missing field lists field name
+✓ ValidationError for wrong type shows expected vs actual
+✓ ValidationError for unregistered component includes component name
+✓ DatabaseError preserves original error as cause
+✓ error messages are user-friendly and actionable
+
+### Query Errors
+
+✓ empty component array returns all entities
+✓ query with no matches returns empty array not null
+✓ DatabaseError for invalid SQL includes SQL snippet
+
+---
+
+## Performance and Stress Tests
+
+### Large Scale Entity Operations
+
+✓ handles 100000 entities efficiently
+✓ createEntity maintains constant time with many entities
+✓ destroyEntity maintains constant time with many entities
+✓ memory usage stays reasonable with 50000 entities
+
+### Large Schema Operations
+
+✓ handles component with 100 fields
+✓ handles component with 50 string fields
+✓ addComponent with large schema completes quickly
+✓ getComponent with large schema completes quickly
+
+### Large Data Operations
+
+✓ handles 1MB JSON field value
+✓ handles 10MB string field value
+✓ handles deeply nested JSON (100 levels)
+✓ handles JSON array with 10000 elements
+✓ handles entity with 50 components attached
+
+### Query Performance
+
+✓ query with 5 components on 10000 entities is fast
+✓ query with exclude on large dataset is fast
+✓ query with filter on large dataset is fast
+✓ queryWithData returns results in reasonable time
+✓ multiple indexes improve query performance measurably
+
+### Bulk Operation Performance
+
+✓ addComponentBulk with 1000 entities completes quickly
+✓ removeComponentBulk with 1000 entities completes quickly
+✓ bulk operations faster than individual operations
+
+---
+
+## Concurrency and Transaction Tests
+
+### Concurrent Transactions
+
+✓ multiple simultaneous transactions execute correctly
+✓ nested transactions within parallel operations work
+✓ transaction rollback in one doesn't affect others
+✓ concurrent reads during transaction see committed data
+
+### Race Conditions
+
+✓ concurrent entity creation generates unique ids
+✓ concurrent component addition doesn't corrupt data
+✓ concurrent updates to same component serialize correctly
+✓ concurrent queries return consistent results
+
+### Transaction Isolation
+
+✓ uncommitted changes not visible outside transaction
+✓ rolled back transaction leaves no side effects
+✓ transaction callback receives correct ECS instance
+✓ transaction can call other ECS methods safely
+
+### Lock Contention
+
+✓ high concurrency doesn't cause deadlocks
+✓ long-running transaction doesn't block unrelated operations
+✓ database handles multiple connections correctly
+
+---
+
+## Advanced Integration Tests
+
+### Multi-Archetype Systems
+
+✓ game with Player Enemy Item archetypes works together
+✓ querying across different archetypes works correctly
+✓ destroying entity with archetype removes all components
+✓ archetype entities can have additional components added
+
+### Complex Event Scenarios
+
+✓ event handler can safely modify ECS
+✓ event handler throwing error doesn't corrupt state
+✓ removing component in event handler works
+✓ unsubscribing within event handler works
+✓ event handlers execute in registration order
+✓ bulk operations fire events in correct order
+
+### State Management Patterns
+
+✓ ECS persists across application restart
+✓ multiple ECS instances with same DB work correctly
+✓ ECS cleanup releases resources properly
+✓ re-initializing ECS preserves existing data
+
+### Complex Query Patterns
+
+✓ query with 10 component requirements works
+✓ query with exclude list of 5 components works
+✓ combining filter and exclude works correctly
+✓ queryWithData with complex filter works
+✓ chaining multiple queries works efficiently
+
+---
+
+## Data Integrity Tests
+
+### Foreign Key Constraints
+
+✓ orphaned component rows cannot exist
+✓ deleting entity cascades to all 20 components
+✓ foreign key violation throws DatabaseError
+✓ cascade delete works with bulk operations
+
+### Data Type Integrity
+
+✓ boolean stored as 0 or 1 only
+✓ number preserves floating point precision
+✓ json serialization preserves data types
+✓ string encoding handles all UTF-8 correctly
+
+### Schema Validation
+
+✓ schema cannot be modified after definition
+✓ component definition is truly frozen
+✓ attempting to modify schema throws error
+
+---
+
+## Cleanup and Resource Management
+
+### Memory Management
+
+✓ destroying 10000 entities doesn't leak memory
+✓ event handlers are garbage collected after unsubscribe
+✓ query results don't retain unnecessary references
+
+### Database Cleanup
+
+✓ component tables cleaned up on entity destruction
+✓ indexes don't bloat database over time
+✓ vacuuming database reclaims space
+
+---
+
 ## Summary
 
-Total test cases: 181
+Total test cases: 266
 
+**Core Functionality (181 tests):**
 - defineComponent: 11 tests
 - createECS: 6 tests
 - ecs.initialize: 13 tests
-- ecs.createEntity: 9 tests
+- ecs.createEntity: 10 tests
 - ecs.destroyEntity: 6 tests
 - ecs.addComponent: 16 tests
 - ecs.getComponent: 8 tests
-- ecs.updateComponent: 15 tests
+- ecs.updateComponent: 14 tests
 - ecs.removeComponent: 6 tests
 - ecs.hasComponent: 3 tests
 - ecs.query: 10 tests
@@ -461,9 +676,18 @@ Total test cases: 181
 - ecs.rawQuery: 6 tests
 - ecs.transaction: 9 tests
 - Bulk Operations: 7 tests
-- Event System: 18 tests
-- Archetypes: 8 tests
+- Event System: 17 tests
+- Archetypes: 9 tests
 - ecs.addIndex: 6 tests
 - ecs.getDatabase: 2 tests
 - Integration Tests: 6 tests
-- Edge Cases: 11 tests
+- Edge Cases: 10 tests
+
+**Extended Test Suite (85 tests):**
+- Advanced Validation Tests: 22 tests
+- Error Message Validation: 14 tests
+- Performance and Stress Tests: 23 tests
+- Concurrency and Transaction Tests: 15 tests
+- Advanced Integration Tests: 15 tests
+- Data Integrity Tests: 10 tests
+- Cleanup and Resource Management: 5 tests
