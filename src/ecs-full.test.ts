@@ -209,35 +209,39 @@ function createTestDatabase(): Database {
       }
 
       // SELECT from a single component table (with or without WHERE clause)
-      if (sqlStr.includes('SELECT') && sqlStr.includes('FROM component_') && !sqlStr.includes('JOIN')) {
-        const match = sqlStr.match(/FROM (component_\w+)/)
-        if (match) {
-          const tableName = match[1]
-          const table = componentTables.get(tableName)
-          if (table) {
-            let results = Array.from(table.values())
+      if (sqlStr.includes('SELECT') && (sqlStr.includes('FROM component_') || sqlStr.includes('FROM "component_'))) {
+        // Don't match if it's a multi-table JOIN
+        if (sqlStr.includes('JOIN')) {
+          // Let the JOIN handler below handle this
+        } else {
+          const match = sqlStr.match(/FROM "?(component_\w+)"?/)
+          if (match) {
+            const tableName = match[1]
+            const table = componentTables.get(tableName)
+            if (table) {
+              let results = Array.from(table.values())
 
-            // Handle WHERE clause with parameters
-            if (sqlStr.includes('WHERE') && paramsArray.length > 0) {
-              // Match either quoted or unquoted identifiers in WHERE clause
-              const whereMatch = sqlStr.match(/WHERE\s+"([^"]+)"\s*=\s*\?|WHERE\s+(\w+)\s*=\s*\?/)
-              if (whereMatch) {
-                const fieldName = whereMatch[1] || whereMatch[2]
-                const fieldValue = paramsArray[0]
-                results = results.filter(row => row[fieldName] === fieldValue)
+              // Handle WHERE clause with parameters
+              if (sqlStr.includes('WHERE') && paramsArray.length > 0) {
+                // Match either quoted or unquoted identifiers in WHERE clause
+                const whereMatch = sqlStr.match(/WHERE\s+"([^"]+)"\s*=\s*\?|WHERE\s+(\w+)\s*=\s*\?/)
+                if (whereMatch) {
+                  const fieldName = whereMatch[1] || whereMatch[2]
+                  const fieldValue = paramsArray[0]
+                  results = results.filter(row => row[fieldName] === fieldValue)
+                }
               }
-            }
 
-            // Check if SELECT is requesting only entity_id (for query() method)
-            // Pattern: SELECT t0."entity_id" FROM ...
-            if (sqlStr.match(/SELECT\s+\w+\."?entity_id"?/)) {
-              return results.map(row => ({ entity_id: row.entity_id })) as T[]
-            }
+              // Check if SELECT is requesting only entity_id (for query() method)
+              // Pattern: SELECT t0."entity_id" FROM ...
+              if (sqlStr.match(/SELECT\s+\w+\."?entity_id"?/)) {
+                return results.map(row => ({ entity_id: row.entity_id })) as T[]
+              }
 
-            return results as T[]
+              return results as T[]
+            }
           }
         }
-        return []
       }
 
       // Query with JOIN - find entities with all components
