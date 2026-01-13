@@ -182,8 +182,8 @@ export interface ECS {
   ): UnsubscribeFunction
 
   // Archetype support
-  defineArchetype<T extends readonly ComponentDefinition[]>(
-    components: T
+  defineArchetype(
+    components: readonly ComponentDefinition[]
   ): ArchetypeDefinition
   createFromArchetype<T extends readonly ComponentDefinition[]>(
     archetype: ArchetypeDefinition,

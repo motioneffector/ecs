@@ -57,11 +57,11 @@ export function defineComponent<T extends ComponentSchema>(
   }
 
   // Validate field types
-  const validTypes: FieldType[] = ['string', 'number', 'boolean', 'json']
+  const validTypes = new Set<FieldType>(['string', 'number', 'boolean', 'json'])
   for (const [fieldName, fieldType] of Object.entries(schema)) {
-    if (!validTypes.includes(fieldType as FieldType)) {
+    if (!validTypes.has(fieldType)) {
       throw new ValidationError(
-        `Invalid field type "${fieldType}" for field "${fieldName}". Must be one of: ${validTypes.join(', ')}`,
+        `Invalid field type "${fieldType}" for field "${fieldName}". Must be one of: ${[...validTypes].join(', ')}`,
         fieldName
       )
     }

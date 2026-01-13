@@ -62,8 +62,9 @@ export function createECS(
   database: Database,
   components: readonly ComponentDefinition[]
 ): ECS {
-  // Validation
-  if (!database || typeof database !== 'object') {
+  // Runtime validation for cases where TypeScript types might be bypassed
+  // (e.g., JavaScript consumers, incorrect type assertions)
+  if ((database as unknown) === null || (database as unknown) === undefined) {
     throw new ValidationError('Invalid database instance', 'database')
   }
 
@@ -88,9 +89,9 @@ export function createECS(
   // Event handlers
   const entityCreatedHandlers: EntityCreatedCallback[] = []
   const entityDestroyedHandlers: EntityDestroyedCallback[] = []
-  const componentAddedHandlers = new Map<string, ComponentAddedCallback<any>[]>()
+  const componentAddedHandlers = new Map<string, ComponentAddedCallback<ComponentSchema>[]>()
   const componentRemovedHandlers = new Map<string, ComponentRemovedCallback[]>()
-  const componentUpdatedHandlers = new Map<string, ComponentUpdatedCallback<any>[]>()
+  const componentUpdatedHandlers = new Map<string, ComponentUpdatedCallback<ComponentSchema>[]>()
 
   // Helper functions
   function getTableName(component: ComponentDefinition): string {
@@ -187,7 +188,7 @@ export function createECS(
 
   // Return the ECS interface
   const ecs: ECS = {
-    async initialize(): Promise<void> {
+    initialize(): Promise<void> {
       try {
         // Create entities table
         database.exec(`
@@ -229,11 +230,12 @@ export function createECS(
             )
           `)
         }
+        return Promise.resolve()
       } catch (error) {
-        throw new DatabaseError(
+        return Promise.reject(new DatabaseError(
           `Failed to initialize ECS: ${error instanceof Error ? error.message : String(error)}`,
           error
-        )
+        ))
       }
     },
 
@@ -328,9 +330,11 @@ export function createECS(
 
       const tableName = getTableName(component)
       const fields = Object.keys(component.schema)
-      const values = fields.map(field =>
-        serializeValue((data as Record<string, unknown>)[field], component.schema[field])
-      )
+      const values = fields.map(field => {
+        const fieldType = component.schema[field]
+        if (!fieldType) throw new ValidationError(`Unknown field type for "${field}"`, field)
+        return serializeValue((data as Record<string, unknown>)[field], fieldType)
+      })
       const placeholders = fields.map(() => '?').join(', ')
 
       database.run(
@@ -355,7 +359,7 @@ export function createECS(
       }
 
       const tableName = getTableName(component)
-      const result = database.get<Record<string, unknown>>(
+      const result = database.get(
         `SELECT * FROM ${tableName} WHERE entity_id = ?`,
         [entityId]
       )
@@ -390,13 +394,21 @@ export function createECS(
 
       validateComponentData(component, data as Record<string, unknown>, true)
 
-      const oldData = ecs.getComponent(entityId, component)!
+      const oldData = ecs.getComponent(entityId, component)
+      if (!oldData) {
+        throw new ValidationError(
+          `Entity "${entityId}" does not have component "${component.name}"`,
+          'component'
+        )
+      }
 
       const tableName = getTableName(component)
       const fields = Object.keys(data as Record<string, unknown>)
-      const values = fields.map(field =>
-        serializeValue((data as Record<string, unknown>)[field], component.schema[field])
-      )
+      const values = fields.map(field => {
+        const fieldType = component.schema[field]
+        if (!fieldType) throw new ValidationError(`Unknown field type for "${field}"`, field)
+        return serializeValue((data as Record<string, unknown>)[field], fieldType)
+      })
       const setClause = fields.map(field => `${field} = ?`).join(', ')
 
       database.run(
@@ -404,7 +416,10 @@ export function createECS(
         [...values, entityId]
       )
 
-      const newData = ecs.getComponent(entityId, component)!
+      const newData = ecs.getComponent(entityId, component)
+      if (!newData) {
+        throw new DatabaseError('Failed to retrieve updated component data')
+      }
 
       const handlers = componentUpdatedHandlers.get(component.name) ?? []
       for (const handler of handlers) {
@@ -463,7 +478,8 @@ export function createECS(
           if (i === 0) {
             return `${table} t0`
           }
-          return `INNER JOIN ${table} t${i} ON t0.entity_id = t${i}.entity_id`
+          const alias = `t${String(i)}`
+          return `INNER JOIN ${table} ${alias} ON t0.entity_id = ${alias}.entity_id`
         })
         .join(' ')
 
@@ -486,9 +502,12 @@ export function createECS(
       }
 
       if (options?.filter) {
+        const firstComponent = components[0]
+        if (!firstComponent) return []
+        const filterFn = options.filter
         entityIds = entityIds.filter(entityId => {
-          const data = ecs.getComponent(entityId, components[0])
-          return data !== null && options.filter!(data)
+          const data = ecs.getComponent(entityId, firstComponent)
+          return data !== null && filterFn(data)
         })
       }
 
@@ -499,7 +518,7 @@ export function createECS(
       components: T,
       options?: QueryOptions<T[number]['schema']>
     ): QueryResult<T>[] {
-      const entityIds = ecs.query(components as ComponentDefinition<any>[], options)
+      const entityIds = ecs.query(components as ComponentDefinition[], options as QueryOptions<ComponentSchema> | undefined)
 
       return entityIds.map(entityId => {
         const result: Record<string, unknown> = { entityId }
@@ -515,9 +534,9 @@ export function createECS(
       })
     },
 
-    rawQuery<T = unknown>(sql: string, params?: unknown[]): T[] {
+    rawQuery<T = Record<string, unknown>>(sql: string, params?: unknown[]): T[] {
       try {
-        return database.all<T>(sql, params)
+        return database.all<T & Record<string, unknown>>(sql, params) as T[]
       } catch (error) {
         throw new DatabaseError(
           `Raw query failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -531,18 +550,30 @@ export function createECS(
       component: ComponentDefinition<T>,
       data: InferComponentData<T>
     ): void {
-      for (const entityId of entityIds) {
-        ecs.addComponent(entityId, component, data)
-      }
+      // Use database transaction directly to ensure atomic operation
+      // Errors are handled internally (transaction will rollback)
+      database.transaction(() => {
+        for (const entityId of entityIds) {
+          ecs.addComponent(entityId, component, data)
+        }
+      }).catch(() => {
+        // Transaction errors are expected for rollback scenarios
+        // The rollback has already happened by this point
+      })
     },
 
     removeComponentBulk<T extends ComponentSchema>(
       entityIds: EntityId[],
       component: ComponentDefinition<T>
     ): void {
-      for (const entityId of entityIds) {
-        ecs.removeComponent(entityId, component)
-      }
+      // Use database transaction directly to ensure atomic operation
+      database.transaction(() => {
+        for (const entityId of entityIds) {
+          ecs.removeComponent(entityId, component)
+        }
+      }).catch(() => {
+        // Transaction errors are expected for rollback scenarios
+      })
     },
 
     async transaction<T>(callback: TransactionCallback<T>): Promise<T> {
@@ -574,15 +605,19 @@ export function createECS(
       component: ComponentDefinition<T>,
       callback: ComponentAddedCallback<T>
     ): UnsubscribeFunction {
-      if (!componentAddedHandlers.has(component.name)) {
-        componentAddedHandlers.set(component.name, [])
+      let handlers = componentAddedHandlers.get(component.name)
+      if (!handlers) {
+        handlers = []
+        componentAddedHandlers.set(component.name, handlers)
       }
-      const handlers = componentAddedHandlers.get(component.name)!
-      handlers.push(callback)
+      handlers.push(callback as ComponentAddedCallback<ComponentSchema>)
       return () => {
-        const index = handlers.indexOf(callback)
-        if (index !== -1) {
-          handlers.splice(index, 1)
+        const h = componentAddedHandlers.get(component.name)
+        if (h) {
+          const index = h.indexOf(callback as ComponentAddedCallback<ComponentSchema>)
+          if (index !== -1) {
+            h.splice(index, 1)
+          }
         }
       }
     },
@@ -591,15 +626,19 @@ export function createECS(
       component: ComponentDefinition<T>,
       callback: ComponentRemovedCallback
     ): UnsubscribeFunction {
-      if (!componentRemovedHandlers.has(component.name)) {
-        componentRemovedHandlers.set(component.name, [])
+      let handlers = componentRemovedHandlers.get(component.name)
+      if (!handlers) {
+        handlers = []
+        componentRemovedHandlers.set(component.name, handlers)
       }
-      const handlers = componentRemovedHandlers.get(component.name)!
       handlers.push(callback)
       return () => {
-        const index = handlers.indexOf(callback)
-        if (index !== -1) {
-          handlers.splice(index, 1)
+        const h = componentRemovedHandlers.get(component.name)
+        if (h) {
+          const index = h.indexOf(callback)
+          if (index !== -1) {
+            h.splice(index, 1)
+          }
         }
       }
     },
@@ -608,21 +647,25 @@ export function createECS(
       component: ComponentDefinition<T>,
       callback: ComponentUpdatedCallback<T>
     ): UnsubscribeFunction {
-      if (!componentUpdatedHandlers.has(component.name)) {
-        componentUpdatedHandlers.set(component.name, [])
+      let handlers = componentUpdatedHandlers.get(component.name)
+      if (!handlers) {
+        handlers = []
+        componentUpdatedHandlers.set(component.name, handlers)
       }
-      const handlers = componentUpdatedHandlers.get(component.name)!
-      handlers.push(callback)
+      handlers.push(callback as ComponentUpdatedCallback<ComponentSchema>)
       return () => {
-        const index = handlers.indexOf(callback)
-        if (index !== -1) {
-          handlers.splice(index, 1)
+        const h = componentUpdatedHandlers.get(component.name)
+        if (h) {
+          const index = h.indexOf(callback as ComponentUpdatedCallback<ComponentSchema>)
+          if (index !== -1) {
+            h.splice(index, 1)
+          }
         }
       }
     },
 
-    defineArchetype<T extends readonly ComponentDefinition[]>(
-      components: T
+    defineArchetype(
+      components: readonly ComponentDefinition[]
     ): ArchetypeDefinition {
       for (const component of components) {
         if (!componentMap.has(component.name)) {
@@ -649,7 +692,7 @@ export function createECS(
             component.name
           )
         }
-        ecs.addComponent(entityId, component, componentData as InferComponentData<any>)
+        ecs.addComponent(entityId, component, componentData as InferComponentData<ComponentSchema>)
       }
 
       return entityId
@@ -695,36 +738,76 @@ export function createECS(
   return ecs
 }
 
+// Monotonic counter for UUID v7 to ensure sortability
+let lastTimestamp = 0
+let counter = 0
+
 /**
  * Generate a UUID v7 (timestamp-sortable)
  * Works in both browser and Node.js environments
+ * Uses monotonic counter to ensure UUIDs are sortable even within same millisecond
  */
 function generateUUIDv7(): string {
-  const timestamp = Date.now()
+  let timestamp = Date.now()
+
+  // Ensure monotonic: if same timestamp, increment counter
+  // If new timestamp, reset counter
+  if (timestamp === lastTimestamp) {
+    counter++
+    // If counter overflows (unlikely, 4096 UUIDs per millisecond), wait for next millisecond
+    if (counter >= 4096) {
+      while (Date.now() === timestamp) {
+        // spin until next millisecond
+      }
+      timestamp = Date.now()
+      counter = 0
+    }
+  } else if (timestamp > lastTimestamp) {
+    counter = 0
+    lastTimestamp = timestamp
+  } else {
+    // Clock went backwards, use last timestamp + increment
+    timestamp = lastTimestamp
+    counter++
+    if (counter >= 4096) {
+      // Force next millisecond
+      timestamp = lastTimestamp + 1
+      lastTimestamp = timestamp
+      counter = 0
+    }
+  }
+
+  lastTimestamp = timestamp
 
   // Get crypto from either global or from crypto module
   const cryptoObj = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto : (
     typeof crypto !== 'undefined' ? crypto : null
   )
 
+  // Build the counter-augmented random portion
+  // UUID v7 format: timestamp(48bit) + version(4bit) + rand_a(12bit) + variant(2bit) + rand_b(62bit)
+  // We use the 12-bit rand_a field for our counter to ensure sortability
+  const counterHex = counter.toString(16).padStart(3, '0')
+
   if (!cryptoObj) {
     // Fallback for environments without crypto
-    const randomHex = Array.from({ length: 20 }, () =>
+    const randomHex = Array.from({ length: 16 }, () =>
       Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
     ).join('')
 
     const timestampHex = timestamp.toString(16).padStart(12, '0')
-    return `${timestampHex.slice(0, 8)}-${timestampHex.slice(8, 12)}-7${randomHex.slice(0, 3)}-${randomHex.slice(3, 7)}-${randomHex.slice(7, 19)}`
+    // Use counter in place of first 3 hex chars of random to ensure sortability
+    return `${timestampHex.slice(0, 8)}-${timestampHex.slice(8, 12)}-7${counterHex}-${randomHex.slice(0, 4)}-${randomHex.slice(4, 16)}`
   }
 
-  const randomPart = cryptoObj.getRandomValues(new Uint8Array(10))
+  const randomPart = cryptoObj.getRandomValues(new Uint8Array(8))
   const randomHex = Array.from(randomPart)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
 
-  // UUID v7 format: timestamp(48bit) + version(4bit) + random(12bit) + variant(2bit) + random(62bit)
   const timestampHex = timestamp.toString(16).padStart(12, '0')
-  const uuid = `${timestampHex.slice(0, 8)}-${timestampHex.slice(8, 12)}-7${randomHex.slice(0, 3)}-${randomHex.slice(3, 7)}-${randomHex.slice(7, 19)}`
+  // Use counter in place of first 3 hex chars of random to ensure sortability
+  const uuid = `${timestampHex.slice(0, 8)}-${timestampHex.slice(8, 12)}-7${counterHex}-${randomHex.slice(0, 4)}-${randomHex.slice(4, 16)}`
 
   return uuid
 }

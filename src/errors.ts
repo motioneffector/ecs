@@ -31,7 +31,7 @@ export class ValidationError extends ECSError {
 export class DatabaseError extends ECSError {
   constructor(
     message: string,
-    public readonly cause?: unknown
+    public override readonly cause?: unknown
   ) {
     super(message)
     this.name = 'DatabaseError'
