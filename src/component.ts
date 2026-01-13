@@ -68,9 +68,11 @@ export function defineComponent<T extends ComponentSchema>(
   }
 
   // Create and freeze the component definition
+  // Deep freeze: freeze both the definition and the schema
+  const frozenSchema = Object.freeze({ ...schema })
   const definition: ComponentDefinition<T> = Object.freeze({
     name: name.trim(),
-    schema,
+    schema: frozenSchema,
   })
 
   return definition

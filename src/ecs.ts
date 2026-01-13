@@ -94,8 +94,18 @@ export function createECS(
   const componentUpdatedHandlers = new Map<string, ComponentUpdatedCallback<ComponentSchema>[]>()
 
   // Helper functions
+  function escapeIdentifier(identifier: string): string {
+    // Use double quotes for SQL identifiers per SQL standard
+    // Escape any double quotes in the identifier by doubling them
+    return `"${identifier.replace(/"/g, '""')}"`
+  }
+
   function getTableName(component: ComponentDefinition): string {
     return `component_${component.name}`
+  }
+
+  function getEscapedTableName(component: ComponentDefinition): string {
+    return escapeIdentifier(getTableName(component))
   }
 
   function serializeValue(value: unknown, fieldType: string): unknown {
@@ -200,8 +210,8 @@ export function createECS(
 
         // Create component tables
         for (const component of components) {
-          const tableName = `component_${component.name}`
-          const columns: string[] = ['entity_id TEXT PRIMARY KEY']
+          const tableName = getEscapedTableName(component)
+          const columns: string[] = [`${escapeIdentifier('entity_id')} TEXT PRIMARY KEY`]
 
           for (const [fieldName, fieldType] of Object.entries(component.schema)) {
             let sqlType: string
@@ -219,10 +229,10 @@ export function createECS(
                 sqlType = 'TEXT'
                 break
             }
-            columns.push(`${fieldName} ${sqlType} NOT NULL`)
+            columns.push(`${escapeIdentifier(fieldName)} ${sqlType} NOT NULL`)
           }
 
-          columns.push('FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE')
+          columns.push(`FOREIGN KEY (${escapeIdentifier('entity_id')}) REFERENCES entities(id) ON DELETE CASCADE`)
 
           database.exec(`
             CREATE TABLE IF NOT EXISTS ${tableName} (
@@ -262,7 +272,12 @@ export function createECS(
 
       // Fire entity created event
       for (const handler of entityCreatedHandlers) {
-        handler(id)
+        try {
+          handler(id)
+        } catch (error) {
+          // Log error but don't throw - event handlers should not corrupt state
+          console.error('Error in onEntityCreated handler:', error)
+        }
       }
 
       return id
@@ -285,7 +300,11 @@ export function createECS(
       for (const component of componentsToRemove) {
         const handlers = componentRemovedHandlers.get(component.name) ?? []
         for (const handler of handlers) {
-          handler(entityId)
+          try {
+            handler(entityId)
+          } catch (error) {
+            console.error('Error in onComponentRemoved handler:', error)
+          }
         }
       }
 
@@ -295,7 +314,11 @@ export function createECS(
       // Fire entity destroyed event
       if (result.changes > 0) {
         for (const handler of entityDestroyedHandlers) {
-          handler(entityId)
+          try {
+            handler(entityId)
+          } catch (error) {
+            console.error('Error in onEntityDestroyed handler:', error)
+          }
         }
         return true
       }
@@ -328,8 +351,9 @@ export function createECS(
 
       validateComponentData(component, data as Record<string, unknown>)
 
-      const tableName = getTableName(component)
+      const tableName = getEscapedTableName(component)
       const fields = Object.keys(component.schema)
+      const escapedFields = fields.map(f => escapeIdentifier(f))
       const values = fields.map(field => {
         const fieldType = component.schema[field]
         if (!fieldType) throw new ValidationError(`Unknown field type for "${field}"`, field)
@@ -338,13 +362,17 @@ export function createECS(
       const placeholders = fields.map(() => '?').join(', ')
 
       database.run(
-        `INSERT INTO ${tableName} (entity_id, ${fields.join(', ')}) VALUES (?, ${placeholders})`,
+        `INSERT INTO ${tableName} (${escapeIdentifier('entity_id')}, ${escapedFields.join(', ')}) VALUES (?, ${placeholders})`,
         [entityId, ...values]
       )
 
       const handlers = componentAddedHandlers.get(component.name) ?? []
       for (const handler of handlers) {
-        handler(entityId, data)
+        try {
+          handler(entityId, data)
+        } catch (error) {
+          console.error('Error in onComponentAdded handler:', error)
+        }
       }
 
       return entityId
@@ -358,9 +386,9 @@ export function createECS(
         return null
       }
 
-      const tableName = getTableName(component)
+      const tableName = getEscapedTableName(component)
       const result = database.get(
-        `SELECT * FROM ${tableName} WHERE entity_id = ?`,
+        `SELECT * FROM ${tableName} WHERE ${escapeIdentifier('entity_id')} = ?`,
         [entityId]
       )
 
@@ -402,17 +430,17 @@ export function createECS(
         )
       }
 
-      const tableName = getTableName(component)
+      const tableName = getEscapedTableName(component)
       const fields = Object.keys(data as Record<string, unknown>)
       const values = fields.map(field => {
         const fieldType = component.schema[field]
         if (!fieldType) throw new ValidationError(`Unknown field type for "${field}"`, field)
         return serializeValue((data as Record<string, unknown>)[field], fieldType)
       })
-      const setClause = fields.map(field => `${field} = ?`).join(', ')
+      const setClause = fields.map(field => `${escapeIdentifier(field)} = ?`).join(', ')
 
       database.run(
-        `UPDATE ${tableName} SET ${setClause} WHERE entity_id = ?`,
+        `UPDATE ${tableName} SET ${setClause} WHERE ${escapeIdentifier('entity_id')} = ?`,
         [...values, entityId]
       )
 
@@ -423,7 +451,11 @@ export function createECS(
 
       const handlers = componentUpdatedHandlers.get(component.name) ?? []
       for (const handler of handlers) {
-        handler(entityId, oldData, newData)
+        try {
+          handler(entityId, oldData, newData)
+        } catch (error) {
+          console.error('Error in onComponentUpdated handler:', error)
+        }
       }
 
       return entityId
@@ -439,13 +471,17 @@ export function createECS(
 
       const hadComponent = ecs.hasComponent(entityId, component)
 
-      const tableName = getTableName(component)
-      database.run(`DELETE FROM ${tableName} WHERE entity_id = ?`, [entityId])
+      const tableName = getEscapedTableName(component)
+      database.run(`DELETE FROM ${tableName} WHERE ${escapeIdentifier('entity_id')} = ?`, [entityId])
 
       if (hadComponent) {
         const handlers = componentRemovedHandlers.get(component.name) ?? []
         for (const handler of handlers) {
-          handler(entityId)
+          try {
+            handler(entityId)
+          } catch (error) {
+            console.error('Error in onComponentRemoved handler:', error)
+          }
         }
       }
 
@@ -472,27 +508,27 @@ export function createECS(
         return results.map(r => r.id)
       }
 
-      const tableNames = components.map(c => getTableName(c))
+      const tableNames = components.map(c => getEscapedTableName(c))
       const joins = tableNames
         .map((table, i) => {
           if (i === 0) {
             return `${table} t0`
           }
           const alias = `t${String(i)}`
-          return `INNER JOIN ${table} ${alias} ON t0.entity_id = ${alias}.entity_id`
+          return `INNER JOIN ${table} ${alias} ON t0.${escapeIdentifier('entity_id')} = ${alias}.${escapeIdentifier('entity_id')}`
         })
         .join(' ')
 
-      const sql = `SELECT t0.entity_id FROM ${joins}`
+      const sql = `SELECT t0.${escapeIdentifier('entity_id')} FROM ${joins}`
       const results = database.all<{ entity_id: string }>(sql)
       let entityIds = results.map(r => r.entity_id)
 
       if (options?.exclude && options.exclude.length > 0) {
         const excludeSet = new Set<string>()
         for (const excludeComponent of options.exclude) {
-          const excludeTable = getTableName(excludeComponent)
+          const excludeTable = getEscapedTableName(excludeComponent)
           const excludeResults = database.all<{ entity_id: string }>(
-            `SELECT entity_id FROM ${excludeTable}`
+            `SELECT ${escapeIdentifier('entity_id')} FROM ${excludeTable}`
           )
           for (const result of excludeResults) {
             excludeSet.add(result.entity_id)
@@ -502,12 +538,17 @@ export function createECS(
       }
 
       if (options?.filter) {
-        const firstComponent = components[0]
-        if (!firstComponent) return []
         const filterFn = options.filter
         entityIds = entityIds.filter(entityId => {
-          const data = ecs.getComponent(entityId, firstComponent)
-          return data !== null && filterFn(data)
+          // Build data object with all components
+          const data: Record<string, unknown> = {}
+          for (const component of components) {
+            const componentData = ecs.getComponent(entityId, component)
+            if (componentData !== null) {
+              data[component.name] = componentData
+            }
+          }
+          return filterFn(data)
         })
       }
 
@@ -716,12 +757,13 @@ export function createECS(
         )
       }
 
-      const tableName = getTableName(component)
+      const tableName = getEscapedTableName(component)
       const fieldName = String(field)
-      const indexName = `idx_${tableName}_${fieldName}`
+      const rawTableName = getTableName(component)
+      const indexName = escapeIdentifier(`idx_${rawTableName}_${fieldName}`)
 
       try {
-        database.exec(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} (${fieldName})`)
+        database.exec(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} (${escapeIdentifier(fieldName)})`)
       } catch (error) {
         throw new DatabaseError(
           `Failed to create index: ${error instanceof Error ? error.message : String(error)}`,
