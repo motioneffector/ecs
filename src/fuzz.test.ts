@@ -450,7 +450,7 @@ describe('Fuzz: createEntity', () => {
     await ecs.initialize()
     const ids = new Set<string>()
 
-    await fuzzLoop(async (random, i) => {
+    const result = await fuzzLoop(async (random, i) => {
       const id = await ecs.createEntity()
       expect(typeof id).toBe('string')
       expect(id.length).toBeGreaterThan(0)
@@ -458,7 +458,8 @@ describe('Fuzz: createEntity', () => {
       ids.add(id)
     })
 
-    expect(ids.size).toBe(STANDARD_ITERATIONS) // All iterations produced unique IDs
+    // All iterations produced unique IDs (actual count from fuzzLoop)
+    expect(ids.size).toBe(result.iterations)
     db.close()
   })
 
