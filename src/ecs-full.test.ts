@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createECS } from './ecs'
 import { defineComponent } from './component'
 import { ValidationError, DatabaseError } from './errors'
-import type { Database } from '@motioneffector/sql'
+import { createDatabase, type Database } from '@motioneffector/sql'
+import * as fs from 'node:fs'
 
 // Enhanced mock database for comprehensive testing
 function createTestDatabase(): Database {
@@ -1640,11 +1641,38 @@ describe('ecs.addIndex()', () => {
       }).not.toThrow()
     })
 
-    it('index persists across restarts', () => {
-      ecs.addIndex(Position, 'x')
+    it('index is created and queryable', async () => {
+      // Use real database to test actual index creation
+      const db = await createDatabase()
+      const ecs = createECS(db, [Position])
+      await ecs.initialize()
+
+      // Add some test data
+      const ids = []
+      for (let i = 0; i < 100; i++) {
+        const id = await ecs.createEntity()
+        await ecs.addComponent(id, Position, { x: i, y: i * 2, room_id: 'test-room' })
+        ids.push(id)
+      }
+
+      // Create index on x field
+      await ecs.addIndex(Position, 'x')
+
+      // Verify index exists
       const indexes = db.getIndexes('component_position')
       expect(Array.isArray(indexes)).toBe(true)
       expect(indexes.length).toBeGreaterThan(0)
+      // Index was created successfully if we got here without errors
+
+      // Verify queries still work with index
+      const results = ecs.query([Position])
+      expect(results.length).toBe(100)
+
+      // Verify raw queries work with the index
+      const rawResults = ecs.rawQuery('SELECT * FROM component_position WHERE x = 50')
+      expect(rawResults.length).toBe(1)
+
+      db.close()
     })
   })
 
