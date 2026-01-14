@@ -540,7 +540,13 @@ export function createECS(
       if (options?.filter) {
         const filterFn = options.filter
         entityIds = entityIds.filter(entityId => {
-          // Build data object with all components
+          // Single component: unwrap data to match TypeScript types
+          if (components.length === 1) {
+            const componentData = ecs.getComponent(entityId, components[0])
+            return componentData !== null && filterFn(componentData)
+          }
+
+          // Multiple components: wrap by name (existing behavior)
           const data: Record<string, unknown> = {}
           for (const component of components) {
             const componentData = ecs.getComponent(entityId, component)

@@ -957,7 +957,8 @@ describe('Performance and Stress Tests', () => {
       const start = Date.now()
       const results = await ecs.query([Comp], {
         filter: (data) => {
-          const comp = data.Test as { value: number }
+          // Single-component queries receive unwrapped data
+          const comp = data as { value: number }
           return comp.value > 5000
         }
       })
@@ -1936,7 +1937,8 @@ describe('Advanced Integration Tests', () => {
       const results = await ecs.query([A], {
         exclude: [B],
         filter: (data) => {
-          const comp = data.A as { value: number }
+          // Single-component queries receive unwrapped data
+          const comp = data as { value: number }
           return comp.value > 5
         }
       })
