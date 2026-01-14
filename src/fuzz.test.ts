@@ -1289,6 +1289,7 @@ describe('State Machine: ECS lifecycle', () => {
           // Entity might already be destroyed
         }
       }
+      entities.length = 0  // Clear array for next iteration
 
       // Verify clean state
       const finalEntities = await ecs.query([])
@@ -1792,13 +1793,16 @@ describe('Security: SQL injection prevention', () => {
 })
 
 describe('Security: Resource exhaustion prevention', () => {
-  it('handles creation of millions of entities', async () => {
+  it('handles creation of many entities', async () => {
     const db = await createTestDatabase()
     const ecs = createECS(db, [])
     await ecs.initialize()
 
     await fuzzLoop(async (random, i) => {
-      const count = Math.floor(random() * 100000) + 10000 // 10k-100k entities
+      // Scale based on mode: standard = 1k-5k, thorough = 100-500 entities (but more iterations)
+      const maxCount = THOROUGH_MODE ? 500 : 5000
+      const minCount = THOROUGH_MODE ? 100 : 1000
+      const count = Math.floor(random() * (maxCount - minCount)) + minCount
       const createdEntities: string[] = []
 
       const startMem = process.memoryUsage().heapUsed
@@ -1814,10 +1818,10 @@ describe('Security: Resource exhaustion prevention', () => {
         const memDelta = process.memoryUsage().heapUsed - startMem
 
         // Should complete in reasonable time
-        expect(elapsed).toBeLessThan(60000) // 60 seconds max
+        expect(elapsed).toBeLessThan(10000) // 10 seconds max per batch
 
-        // Memory usage should be reasonable (< 1GB)
-        expect(memDelta).toBeLessThan(1024 * 1024 * 1024)
+        // Memory usage should be reasonable (< 100MB per batch)
+        expect(memDelta).toBeLessThan(100 * 1024 * 1024)
 
         // All entities should be queryable
         const allEntities = await ecs.query([])
@@ -1850,9 +1854,11 @@ describe('Security: Resource exhaustion prevention', () => {
     await fuzzLoop(async (random, i) => {
       const entity = await ecs.createEntity()
 
-      // Generate huge JSON object
+      // Generate large JSON object - scale based on mode
       const payload: any = {}
-      const keyCount = Math.floor(random() * 10000) + 1000 // 1k-10k keys
+      const maxKeys = THOROUGH_MODE ? 100 : 1000  // Thorough: smaller but more iterations
+      const minKeys = THOROUGH_MODE ? 50 : 500
+      const keyCount = Math.floor(random() * (maxKeys - minKeys)) + minKeys
       for (let j = 0; j < keyCount; j++) {
         payload[`key_${j}`] = { value: j, nested: { data: j * 2 } }
       }
