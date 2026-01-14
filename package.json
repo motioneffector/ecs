@@ -17,7 +17,13 @@
     "entity-component-system",
     "game-development",
     "sqlite",
-    "typescript"
+    "typescript",
+    "persistent",
+    "database",
+    "game-engine",
+    "entity",
+    "component",
+    "sql"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -30,7 +36,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
   "engines": {
@@ -41,6 +48,7 @@
     "build": "tsc && vite build",
     "test": "vitest",
     "test:run": "vitest run",
+    "fuzz:thorough": "FUZZ_THOROUGH=1 NODE_OPTIONS='--expose-gc' vitest run src/fuzz.test.ts --testTimeout=420000",
     "lint": "eslint src",
     "format": "prettier --write src",
     "typecheck": "tsc --noEmit",
@@ -55,5 +63,8 @@
     "vite": "^6.0.7",
     "vite-plugin-dts": "^4.4.0",
     "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "@motioneffector/sql": "file:../sql"
   }
 }

@@ -5,3 +5,9 @@ coverage/
 .DS_Store
 *.local
 .claude/
+*.patch
+
+# Ignore all root markdown files except README and CHANGELOG
+/*.md
+!README.md
+!CHANGELOG.md

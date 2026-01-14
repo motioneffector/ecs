@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>@motioneffector/ecs - Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; border-bottom: 3px solid #4CAF50; padding-bottom: 10px; }
+    h2 { color: #555; margin-top: 0; }
+    section {
+      margin: 20px 0;
+      padding: 20px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-pass { color: #2e7d32; }
+    .test-fail { color: #c62828; font-weight: bold; }
+    .test-output {
+      background: #f5f5f5;
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 4px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    .run-all {
+      background: #4CAF50;
+      color: white;
+      font-size: 16px;
+      padding: 12px 24px;
+      font-weight: bold;
+    }
+    .clear-btn { background: #757575; color: white; }
+    .summary {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 15px 0;
+      padding: 10px;
+      background: #e3f2fd;
+      border-radius: 4px;
+    }
+    input, textarea {
+      padding: 8px;
+      margin: 4px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    .interactive-output {
+      background: #fff3e0;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      border: 1px solid #ffb74d;
+      min-height: 50px;
+      font-family: monospace;
+    }
+    .control-group {
+      margin: 10px 0;
+      padding: 10px;
+      background: #fafafa;
+      border-radius: 4px;
+    }
+    label {
+      display: inline-block;
+      min-width: 120px;
+      font-weight: 500;
+    }
+    .action-btn { background: #2196F3; color: white; }
+    .danger-btn { background: #f44336; color: white; }
+  </style>
+</head>
+<body>
+  <h1>@motioneffector/ecs Demo</h1>
+  <p>A SQL-backed Entity Component System for game state management with persistence and ACID guarantees.</p>
+
+  <section id="test-runner">
+    <h2>Automated Tests</h2>
+    <p>Click "Run All Tests" to verify all library features work correctly.</p>
+    <button class="run-all" onclick="runAllTests()">▶ Run All Tests</button>
+    <button class="clear-btn" onclick="clearResults()">Clear Results</button>
+    <div class="summary" id="summary"></div>
+    <div class="test-output" id="test-output"></div>
+  </section>
+
+  <section>
+    <h2>Interactive: Entity & Component Management</h2>
+    <p>Manually create entities, add components, and query them.</p>
+
+    <div class="control-group">
+      <h3>Create Entity</h3>
+      <label>Custom ID (optional):</label>
+      <input type="text" id="entityId" placeholder="Leave empty for auto-generated">
+      <button class="action-btn" onclick="createEntityManual()">Create Entity</button>
+    </div>
+
+    <div class="control-group">
+      <h3>Add Component</h3>
+      <label>Entity ID:</label>
+      <input type="text" id="addEntityId" placeholder="entity-123">
+      <label>Component:</label>
+      <select id="componentSelect">
+        <option value="Position">Position</option>
+        <option value="Health">Health</option>
+        <option value="Name">Name</option>
+      </select>
+      <button class="action-btn" onclick="addComponentManual()">Add Component</button>
+    </div>
+
+    <div class="control-group">
+      <h3>Query Entities</h3>
+      <label>Query for:</label>
+      <select id="queryComponent">
+        <option value="Position">Position</option>
+        <option value="Health">Health</option>
+        <option value="Name">Name</option>
+        <option value="Position,Health">Position + Health</option>
+      </select>
+      <button class="action-btn" onclick="queryEntitiesManual()">Query</button>
+    </div>
+
+    <div class="interactive-output" id="interactive-output">Results will appear here...</div>
+  </section>
+
+  <section>
+    <h2>Interactive: Event System</h2>
+    <p>Watch events fire in real-time as you perform operations.</p>
+
+    <button class="action-btn" onclick="setupEventListeners()">Enable Event Logging</button>
+    <button class="clear-btn" onclick="clearEventLog()">Clear Event Log</button>
+
+    <div class="interactive-output" id="event-log">Event log (enable event logging first)...</div>
+  </section>
+
+  <script>
+    // ============================================
+    // INLINED LIBRARY CODE (from dist/index.js)
+    // ============================================
+
+    // Mock Database implementation for browser
+    class MockDatabase {
+      constructor() {
+        this.entities = new Map()
+        this.componentTables = new Map()
+        this.indices = new Map()
+        this.transactionDepth = 0
+      }
+
+      exec(sql) {
+        // Handle CREATE TABLE statements
+        if (sql.includes('CREATE TABLE')) {
+          const match = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
+          if (match) {
+            const tableName = match[1]
+            if (tableName !== 'entities' && !this.componentTables.has(tableName)) {
+              this.componentTables.set(tableName, new Map())
+            }
+          }
+        }
+
+        // Handle CREATE INDEX
+        if (sql.includes('CREATE INDEX')) {
+          const match = sql.match(/CREATE INDEX IF NOT EXISTS (\w+) ON (\w+) \((\w+)\)/)
+          if (match) {
+            const [, indexName, tableName, fieldName] = match
+            if (!this.indices.has(tableName)) {
+              this.indices.set(tableName, new Set())
+            }
+            this.indices.get(tableName).add(fieldName)
+          }
+        }
+      }
+
+      run(sql, params = []) {
+        // INSERT INTO entities
+        if (sql.includes('INSERT INTO entities')) {
+          const [id, created_at] = params
+          this.entities.set(id, { id, created_at })
+          return { changes: 1, lastInsertRowId: 1 }
+        }
+
+        // INSERT INTO component table
+        if (sql.includes('INSERT INTO component_')) {
+          const match = sql.match(/INSERT INTO (component_\w+)/)
+          if (match) {
+            const tableName = match[1]
+            const table = this.componentTables.get(tableName)
+            const fieldMatch = sql.match(/\(([^)]+)\) VALUES/)
+            if (fieldMatch) {
+              const fields = fieldMatch[1].split(',').map(f => f.trim())
+              const data = {}
+              fields.forEach((field, i) => {
+                data[field] = params[i]
+              })
+              table.set(params[0], data)
+            }
+            return { changes: 1, lastInsertRowId: 1 }
+          }
+        }
+
+        // DELETE FROM entities
+        if (sql.includes('DELETE FROM entities')) {
+          const id = params[0]
+          const existed = this.entities.has(id)
+          this.entities.delete(id)
+          // Cascade delete
+          for (const table of this.componentTables.values()) {
+            table.delete(id)
+          }
+          return { changes: existed ? 1 : 0 }
+        }
+
+        // DELETE FROM component table
+        if (sql.includes('DELETE FROM component_')) {
+          const match = sql.match(/DELETE FROM (component_\w+)/)
+          if (match) {
+            const tableName = match[1]
+            const table = this.componentTables.get(tableName)
+            const entityId = params[0]
+            const existed = table.has(entityId)
+            table.delete(entityId)
+            return { changes: existed ? 1 : 0 }
+          }
+        }
+
+        // UPDATE component table
+        if (sql.includes('UPDATE component_')) {
+          const match = sql.match(/UPDATE (component_\w+) SET (.+) WHERE/)
+          if (match) {
+            const tableName = match[1]
+            const setClause = match[2]
+            const fields = setClause.split(',').map(s => s.trim().split('=')[0].trim())
+            const table = this.componentTables.get(tableName)
+            const entityId = params[params.length - 1]
+            const existing = table.get(entityId)
+            if (existing) {
+              const updated = { ...existing }
+              fields.forEach((field, i) => {
+                updated[field] = params[i]
+              })
+              table.set(entityId, updated)
+              return { changes: 1 }
+            }
+          }
+        }
+
+        return { changes: 0 }
+      }
+
+      get(sql, params = []) {
+        // SELECT from entities
+        if (sql.includes('SELECT id FROM entities WHERE id')) {
+          const id = params[0]
+          return this.entities.get(id)
+        }
+
+        // SELECT from component table
+        if (sql.includes('SELECT * FROM component_')) {
+          const match = sql.match(/SELECT \* FROM (component_\w+)/)
+          if (match) {
+            const tableName = match[1]
+            const table = this.componentTables.get(tableName)
+            const entityId = params[0]
+            return table?.get(entityId)
+          }
+        }
+
+        return undefined
+      }
+
+      all(sql, params = []) {
+        // SELECT all entities
+        if (sql === 'SELECT id FROM entities') {
+          return Array.from(this.entities.values())
+        }
+
+        // SELECT from component table for query
+        if (sql.includes('SELECT') && sql.includes('entity_id FROM component_')) {
+          // Parse the query to extract table joins
+          const tableMatches = [...sql.matchAll(/component_\w+/g)]
+          if (tableMatches.length === 1) {
+            // Single component query
+            const tableName = tableMatches[0][0]
+            const table = this.componentTables.get(tableName)
+            if (table) {
+              return Array.from(table.keys()).map(entityId => ({ entity_id: entityId }))
+            }
+          } else if (tableMatches.length > 1) {
+            // Multi-component query (INNER JOIN)
+            const tables = tableMatches.map(m => this.componentTables.get(m[0]))
+            const firstTable = tables[0]
+            if (!firstTable) return []
+
+            const result = []
+            for (const entityId of firstTable.keys()) {
+              const hasAll = tables.every(t => t && t.has(entityId))
+              if (hasAll) {
+                result.push({ entity_id: entityId })
+              }
+            }
+            return result
+          }
+        }
+
+        // SELECT entity_id from specific component table
+        if (sql.includes('SELECT entity_id FROM component_')) {
+          const match = sql.match(/SELECT entity_id FROM (component_\w+)/)
+          if (match) {
+            const tableName = match[1]
+            const table = this.componentTables.get(tableName)
+            if (table) {
+              return Array.from(table.keys()).map(entityId => ({ entity_id: entityId }))
+            }
+          }
+        }
+
+        return []
+      }
+
+      transaction(callback) {
+        this.transactionDepth++
+        try {
+          const result = callback()
+          this.transactionDepth--
+          return Promise.resolve(result)
+        } catch (error) {
+          this.transactionDepth--
+          return Promise.reject(error)
+        }
+      }
+    }
+
+    // Copy the minified library code and adapt it
+    class D extends Error {
+      constructor(l) {
+        super(l), this.name = "ECSError";
+      }
+    }
+    class a extends D {
+      constructor(l, h) {
+        super(l), this.field = h, this.name = "ValidationError";
+      }
+    }
+    class R extends D {
+      constructor(l, h) {
+        super(l), this.cause = h, this.name = "DatabaseError";
+      }
+    }
+    function A(i, l) {
+      if (!i || i.trim() === "")
+        throw new a("Component name cannot be empty", "name");
+      if (Object.keys(l).length === 0)
+        throw new a("Component schema cannot be empty", "schema");
+      if ("entity_id" in l)
+        throw new a(
+          'Field name "entity_id" is reserved and cannot be used',
+          "entity_id"
+        );
+      const h = /* @__PURE__ */ new Set(["string", "number", "boolean", "json"]);
+      for (const [p, w] of Object.entries(l))
+        if (!h.has(w))
+          throw new a(
+            `Invalid field type "${w}" for field "${p}". Must be one of: ${[...h].join(", ")}`,
+            p
+          );
+      return Object.freeze({
+        name: i.trim(),
+        schema: l
+      });
+    }
+    function M(i, l) {
+      if (i == null)
+        throw new a("Invalid database instance", "database");
+      const h = /* @__PURE__ */ new Set();
+      for (const e of l) {
+        if (h.has(e.name))
+          throw new a(
+            `Duplicate component name: "${e.name}"`,
+            "components"
+          );
+        h.add(e.name);
+      }
+      const y = /* @__PURE__ */ new Map();
+      for (const e of l)
+        y.set(e.name, e);
+      const p = [], w = [], N = /* @__PURE__ */ new Map(), $ = /* @__PURE__ */ new Map(), C = /* @__PURE__ */ new Map();
+      function T(e) {
+        return `component_${e.name}`;
+      }
+      function b(e, n) {
+        return n === "json" ? JSON.stringify(e) : n === "boolean" ? e ? 1 : 0 : e;
+      }
+      function F(e, n) {
+        return n === "json" && typeof e == "string" ? JSON.parse(e) : n === "boolean" ? e === 1 : e;
+      }
+      function j(e, n, t = !1) {
+        const o = e.schema;
+        if (!t) {
+          for (const r of Object.keys(o))
+            if (!(r in n))
+              throw new a(
+                `Missing required field "${r}" for component "${e.name}"`,
+                r
+              );
+        }
+        for (const [r, s] of Object.entries(n)) {
+          if (!(r in o))
+            throw new a(
+              `Unknown field "${r}" for component "${e.name}"`,
+              r
+            );
+          const d = o[r], c = typeof s;
+          switch (d) {
+            case "string":
+              if (c !== "string")
+                throw new a(
+                  `Field "${r}" must be a string, got ${c}`,
+                  r
+                );
+              break;
+            case "number":
+              if (c !== "number")
+                throw new a(
+                  `Field "${r}" must be a number, got ${c}`,
+                  r
+                );
+              break;
+            case "boolean":
+              if (c !== "boolean")
+                throw new a(
+                  `Field "${r}" must be a boolean, got ${c}`,
+                  r
+                );
+              break;
+          }
+        }
+      }
+      function x(e) {
+        return i.get(
+          "SELECT id FROM entities WHERE id = ?",
+          [e]
+        ) !== void 0;
+      }
+      const m = {
+        initialize() {
+          try {
+            i.exec(`
+              CREATE TABLE IF NOT EXISTS entities (
+                id TEXT PRIMARY KEY,
+                created_at INTEGER NOT NULL
+              )
+            `);
+            for (const e of l) {
+              const n = `component_${e.name}`, t = ["entity_id TEXT PRIMARY KEY"];
+              for (const [o, r] of Object.entries(e.schema)) {
+                let s;
+                switch (r) {
+                  case "string":
+                    s = "TEXT";
+                    break;
+                  case "number":
+                    s = "REAL";
+                    break;
+                  case "boolean":
+                    s = "INTEGER";
+                    break;
+                  case "json":
+                    s = "TEXT";
+                    break;
+                }
+                t.push(`${o} ${s} NOT NULL`);
+              }
+              t.push("FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE"), i.exec(`
+                CREATE TABLE IF NOT EXISTS ${n} (
+                  ${t.join(`,
+                  `)}
+                )
+              `);
+            }
+            return Promise.resolve();
+          } catch (e) {
+            return Promise.reject(new R(
+              `Failed to initialize ECS: ${e instanceof Error ? e.message : String(e)}`,
+              e
+            ));
+          }
+        },
+        createEntity(e) {
+          const n = e ?? _();
+          if (e !== void 0) {
+            if (typeof e != "string" || e.trim() === "")
+              throw new a("Entity ID must be a non-empty string", "id");
+            if (i.get(
+              "SELECT id FROM entities WHERE id = ?",
+              [e]
+            ))
+              throw new a(`Entity with ID "${e}" already exists`, "id");
+          }
+          const t = Date.now();
+          i.run("INSERT INTO entities (id, created_at) VALUES (?, ?)", [n, t]);
+          for (const o of p)
+            o(n);
+          return n;
+        },
+        destroyEntity(e) {
+          if (!x(e))
+            return !1;
+          const n = [];
+          for (const o of l)
+            m.hasComponent(e, o) && n.push(o);
+          for (const o of n) {
+            const r = $.get(o.name) ?? [];
+            for (const s of r)
+              s(e);
+          }
+          if (i.run("DELETE FROM entities WHERE id = ?", [e]).changes > 0) {
+            for (const o of w)
+              o(e);
+            return !0;
+          }
+          return !1;
+        },
+        addComponent(e, n, t) {
+          if (!x(e))
+            throw new a(`Entity "${e}" does not exist`, "entityId");
+          if (!y.has(n.name))
+            throw new a(
+              `Component "${n.name}" is not registered with this ECS instance`,
+              "component"
+            );
+          if (m.hasComponent(e, n))
+            throw new a(
+              `Entity "${e}" already has component "${n.name}"`,
+              "component"
+            );
+          j(n, t);
+          const o = T(n), r = Object.keys(n.schema), s = r.map((f) => {
+            const E = n.schema[f];
+            if (!E) throw new a(`Unknown field type for "${f}"`, f);
+            return b(t[f], E);
+          }), d = r.map(() => "?").join(", ");
+          i.run(
+            `INSERT INTO ${o} (entity_id, ${r.join(", ")}) VALUES (?, ${d})`,
+            [e, ...s]
+          );
+          const c = N.get(n.name) ?? [];
+          for (const f of c)
+            f(e, t);
+          return e;
+        },
+        getComponent(e, n) {
+          if (!x(e))
+            return null;
+          const t = T(n), o = i.get(
+            `SELECT * FROM ${t} WHERE entity_id = ?`,
+            [e]
+          );
+          if (!o)
+            return null;
+          const r = {};
+          for (const [s, d] of Object.entries(n.schema))
+            r[s] = F(o[s], d);
+          return r;
+        },
+        updateComponent(e, n, t) {
+          if (!x(e))
+            throw new a(`Entity "${e}" does not exist`, "entityId");
+          if (!m.hasComponent(e, n))
+            throw new a(
+              `Entity "${e}" does not have component "${n.name}"`,
+              "component"
+            );
+          j(n, t, !0);
+          const o = m.getComponent(e, n);
+          if (!o)
+            throw new a(
+              `Entity "${e}" does not have component "${n.name}"`,
+              "component"
+            );
+          const r = T(n), s = Object.keys(t), d = s.map((u) => {
+            const O = n.schema[u];
+            if (!O) throw new a(`Unknown field type for "${u}"`, u);
+            return b(t[u], O);
+          }), c = s.map((u) => `${u} = ?`).join(", ");
+          i.run(
+            `UPDATE ${r} SET ${c} WHERE entity_id = ?`,
+            [...d, e]
+          );
+          const f = m.getComponent(e, n);
+          if (!f)
+            throw new R("Failed to retrieve updated component data");
+          const E = C.get(n.name) ?? [];
+          for (const u of E)
+            u(e, o, f);
+          return e;
+        },
+        removeComponent(e, n) {
+          if (!x(e))
+            throw new a(`Entity "${e}" does not exist`, "entityId");
+          const t = m.hasComponent(e, n), o = T(n);
+          if (i.run(`DELETE FROM ${o} WHERE entity_id = ?`, [e]), t) {
+            const r = $.get(n.name) ?? [];
+            for (const s of r)
+              s(e);
+          }
+          return e;
+        },
+        hasComponent(e, n) {
+          return x(e) ? m.getComponent(e, n) !== null : !1;
+        },
+        query(e, n) {
+          if (e.length === 0)
+            return i.all("SELECT id FROM entities").map((f) => f.id);
+          const r = `SELECT t0.entity_id FROM ${e.map((c) => T(c)).map((c, f) => {
+            if (f === 0)
+              return `${c} t0`;
+            const E = `t${String(f)}`;
+            return `INNER JOIN ${c} ${E} ON t0.entity_id = ${E}.entity_id`;
+          }).join(" ")}`;
+          let d = i.all(r).map((c) => c.entity_id);
+          if (n != null && n.exclude && n.exclude.length > 0) {
+            const c = /* @__PURE__ */ new Set();
+            for (const f of n.exclude) {
+              const E = T(f), u = i.all(
+                `SELECT entity_id FROM ${E}`
+              );
+              for (const O of u)
+                c.add(O.entity_id);
+            }
+            d = d.filter((f) => !c.has(f));
+          }
+          if (n != null && n.filter) {
+            const c = e[0];
+            if (!c) return [];
+            const f = n.filter;
+            d = d.filter((E) => {
+              const u = m.getComponent(E, c);
+              return u !== null && f(u);
+            });
+          }
+          return d;
+        },
+        queryWithData(e, n) {
+          return m.query(e, n).map((o) => {
+            const r = { entityId: o };
+            for (const s of e) {
+              const d = m.getComponent(o, s);
+              d !== null && (r[s.name] = d);
+            }
+            return r;
+          });
+        },
+        rawQuery(e, n) {
+          try {
+            return i.all(e, n);
+          } catch (t) {
+            throw new R(
+              `Raw query failed: ${t instanceof Error ? t.message : String(t)}`,
+              t
+            );
+          }
+        },
+        addComponentBulk(e, n, t) {
+          i.transaction(() => {
+            for (const o of e)
+              m.addComponent(o, n, t);
+          }).catch(() => {
+          });
+        },
+        removeComponentBulk(e, n) {
+          i.transaction(() => {
+            for (const t of e)
+              m.removeComponent(t, n);
+          }).catch(() => {
+          });
+        },
+        async transaction(e) {
+          return await i.transaction(() => e(m));
+        },
+        onEntityCreated(e) {
+          return p.push(e), () => {
+            const n = p.indexOf(e);
+            n !== -1 && p.splice(n, 1);
+          };
+        },
+        onEntityDestroyed(e) {
+          return w.push(e), () => {
+            const n = w.indexOf(e);
+            n !== -1 && w.splice(n, 1);
+          };
+        },
+        onComponentAdded(e, n) {
+          let t = N.get(e.name);
+          return t || (t = [], N.set(e.name, t)), t.push(n), () => {
+            const o = N.get(e.name);
+            if (o) {
+              const r = o.indexOf(n);
+              r !== -1 && o.splice(r, 1);
+            }
+          };
+        },
+        onComponentRemoved(e, n) {
+          let t = $.get(e.name);
+          return t || (t = [], $.set(e.name, t)), t.push(n), () => {
+            const o = $.get(e.name);
+            if (o) {
+              const r = o.indexOf(n);
+              r !== -1 && o.splice(r, 1);
+            }
+          };
+        },
+        onComponentUpdated(e, n) {
+          let t = C.get(e.name);
+          return t || (t = [], C.set(e.name, t)), t.push(n), () => {
+            const o = C.get(e.name);
+            if (o) {
+              const r = o.indexOf(n);
+              r !== -1 && o.splice(r, 1);
+            }
+          };
+        },
+        defineArchetype(e) {
+          for (const n of e)
+            if (!y.has(n.name))
+              throw new a(
+                `Component "${n.name}" is not registered with this ECS instance`,
+                "components"
+              );
+          return { components: e };
+        },
+        createFromArchetype(e, n) {
+          const t = m.createEntity();
+          for (const o of e.components) {
+            const r = n[o.name];
+            if (r === void 0)
+              throw new a(
+                `Missing data for component "${o.name}" in archetype`,
+                o.name
+              );
+            m.addComponent(t, o, r);
+          }
+          return t;
+        },
+        addIndex(e, n) {
+          if (!y.has(e.name))
+            throw new a(
+              `Component "${e.name}" is not registered with this ECS instance`,
+              "component"
+            );
+          if (!(n in e.schema))
+            throw new a(
+              `Field "${String(n)}" does not exist in component "${e.name}"`,
+              String(n)
+            );
+          const t = T(e), o = String(n), r = `idx_${t}_${o}`;
+          try {
+            i.exec(`CREATE INDEX IF NOT EXISTS ${r} ON ${t} (${o})`);
+          } catch (s) {
+            throw new R(
+              `Failed to create index: ${s instanceof Error ? s.message : String(s)}`,
+              s
+            );
+          }
+        },
+        getDatabase() {
+          return i;
+        }
+      };
+      return m;
+    }
+    let S = 0, g = 0;
+    function _() {
+      let i = Date.now();
+      i === S ? (g++, g >= 4096 && (i = Date.now(), g = 0)) : i > S ? (g = 0, S = i) : (i = S, g++, g >= 4096 && (i = S + 1, S = i, g = 0)), S = i;
+      const l = typeof globalThis.crypto < "u" ? globalThis.crypto : typeof crypto < "u" ? crypto : null, h = g.toString(16).padStart(3, "0");
+      if (!l) {
+        const $ = Array.from(
+          { length: 16 },
+          () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")
+        ).join(""), C = i.toString(16).padStart(12, "0");
+        return `${C.slice(0, 8)}-${C.slice(8, 12)}-7${h}-${$.slice(0, 4)}-${$.slice(4, 16)}`;
+      }
+      const y = l.getRandomValues(new Uint8Array(8)), p = Array.from(y).map(($) => $.toString(16).padStart(2, "0")).join(""), w = i.toString(16).padStart(12, "0");
+      return `${w.slice(0, 8)}-${w.slice(8, 12)}-7${h}-${p.slice(0, 4)}-${p.slice(4, 16)}`;
+    }
+
+    // Expose to window
+    window.defineComponent = A
+    window.createECS = M
+    window.ECSError = D
+    window.ValidationError = a
+    window.DatabaseError = R
+    window.MockDatabase = MockDatabase
+  </script>
+
+  <script>
+    // ============================================
+    // DEMO AND TEST CODE
+    // ============================================
+
+    // Test components
+    const Position = defineComponent('Position', { x: 'number', y: 'number' })
+    const Health = defineComponent('Health', { current: 'number', max: 'number' })
+    const Name = defineComponent('Name', { value: 'string' })
+    const Inventory = defineComponent('Inventory', { items: 'json' })
+    const Active = defineComponent('Active', { enabled: 'boolean' })
+
+    // Global ECS instance for interactive demos
+    let demoECS = null
+    let eventUnsubscribers = []
+
+    function initializeDemoECS() {
+      const db = new MockDatabase()
+      demoECS = createECS(db, [Position, Health, Name, Inventory, Active])
+      demoECS.initialize()
+      return demoECS
+    }
+
+    initializeDemoECS()
+
+    const tests = [
+      // Component definition tests
+      {
+        name: 'defineComponent: creates component with valid schema',
+        fn: async () => {
+          const comp = defineComponent('TestComp', { field: 'string' })
+          if (!comp.name || comp.name !== 'TestComp') throw new Error('Component name incorrect')
+          if (!comp.schema || comp.schema.field !== 'string') throw new Error('Schema incorrect')
+        }
+      },
+      {
+        name: 'defineComponent: rejects empty name',
+        fn: async () => {
+          try {
+            defineComponent('', { field: 'string' })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'defineComponent: rejects empty schema',
+        fn: async () => {
+          try {
+            defineComponent('Test', {})
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'defineComponent: rejects reserved field name "entity_id"',
+        fn: async () => {
+          try {
+            defineComponent('Test', { entity_id: 'string' })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+            if (!e.message.includes('reserved')) throw new Error('Wrong error message')
+          }
+        }
+      },
+      {
+        name: 'defineComponent: rejects invalid field type',
+        fn: async () => {
+          try {
+            defineComponent('Test', { field: 'invalid' })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+
+      // ECS initialization tests
+      {
+        name: 'createECS: initializes with empty component list',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          if (!ecs) throw new Error('ECS not created')
+        }
+      },
+      {
+        name: 'createECS: initializes with multiple components',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position, Health, Name])
+          await ecs.initialize()
+          if (!ecs) throw new Error('ECS not created')
+        }
+      },
+      {
+        name: 'createECS: rejects duplicate component names',
+        fn: async () => {
+          try {
+            const db = new MockDatabase()
+            const Dup1 = defineComponent('Duplicate', { x: 'number' })
+            const Dup2 = defineComponent('Duplicate', { y: 'number' })
+            createECS(db, [Dup1, Dup2])
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+            if (!e.message.includes('Duplicate')) throw new Error('Wrong error message')
+          }
+        }
+      },
+
+      // Entity creation tests
+      {
+        name: 'createEntity: generates unique auto ID',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          const id1 = ecs.createEntity()
+          const id2 = ecs.createEntity()
+          if (!id1 || !id2) throw new Error('Entity IDs not generated')
+          if (id1 === id2) throw new Error('Entity IDs not unique')
+        }
+      },
+      {
+        name: 'createEntity: accepts custom ID',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          const id = ecs.createEntity('custom-123')
+          if (id !== 'custom-123') throw new Error('Custom ID not used')
+        }
+      },
+      {
+        name: 'createEntity: rejects duplicate custom ID',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          ecs.createEntity('duplicate')
+          try {
+            ecs.createEntity('duplicate')
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'createEntity: rejects empty string ID',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          try {
+            ecs.createEntity('')
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+
+      // Entity destruction tests
+      {
+        name: 'destroyEntity: removes existing entity',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          const result = ecs.destroyEntity(id)
+          if (!result) throw new Error('Entity not destroyed')
+        }
+      },
+      {
+        name: 'destroyEntity: returns false for non-existent entity',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          const result = ecs.destroyEntity('non-existent')
+          if (result) throw new Error('Should return false for non-existent entity')
+        }
+      },
+
+      // Component operations tests
+      {
+        name: 'addComponent: adds valid component data',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.addComponent(id, Position, { x: 10, y: 20 })
+          const data = ecs.getComponent(id, Position)
+          if (!data || data.x !== 10 || data.y !== 20) throw new Error('Component data incorrect')
+        }
+      },
+      {
+        name: 'addComponent: rejects missing required fields',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          try {
+            ecs.addComponent(id, Position, { x: 10 })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'addComponent: rejects unknown fields',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          try {
+            ecs.addComponent(id, Position, { x: 10, y: 20, z: 30 })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'addComponent: rejects wrong field type',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          try {
+            ecs.addComponent(id, Position, { x: "wrong", y: 20 })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'addComponent: rejects non-existent entity',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          try {
+            ecs.addComponent('fake-id', Position, { x: 10, y: 20 })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'addComponent: rejects duplicate component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.addComponent(id, Position, { x: 10, y: 20 })
+          try {
+            ecs.addComponent(id, Position, { x: 30, y: 40 })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+
+      // getComponent tests
+      {
+        name: 'getComponent: retrieves existing component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Health])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.addComponent(id, Health, { current: 80, max: 100 })
+          const data = ecs.getComponent(id, Health)
+          if (!data || data.current !== 80 || data.max !== 100) throw new Error('Component data incorrect')
+        }
+      },
+      {
+        name: 'getComponent: returns null for missing component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Health])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          const data = ecs.getComponent(id, Health)
+          if (data !== null) throw new Error('Should return null')
+        }
+      },
+      {
+        name: 'getComponent: handles boolean type correctly',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Active])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.addComponent(id, Active, { enabled: true })
+          const data = ecs.getComponent(id, Active)
+          if (!data || data.enabled !== true) throw new Error('Boolean not handled correctly')
+        }
+      },
+      {
+        name: 'getComponent: handles json type correctly',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Inventory])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          const items = ['sword', 'shield', 'potion']
+          ecs.addComponent(id, Inventory, { items })
+          const data = ecs.getComponent(id, Inventory)
+          if (!data || JSON.stringify(data.items) !== JSON.stringify(items)) {
+            throw new Error('JSON not handled correctly')
+          }
+        }
+      },
+
+      // updateComponent tests
+      {
+        name: 'updateComponent: updates partial fields',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Health])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.addComponent(id, Health, { current: 100, max: 100 })
+          ecs.updateComponent(id, Health, { current: 50 })
+          const data = ecs.getComponent(id, Health)
+          if (!data || data.current !== 50 || data.max !== 100) throw new Error('Update failed')
+        }
+      },
+      {
+        name: 'updateComponent: rejects non-existent entity',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Health])
+          await ecs.initialize()
+          try {
+            ecs.updateComponent('fake-id', Health, { current: 50 })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+      {
+        name: 'updateComponent: rejects missing component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Health])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          try {
+            ecs.updateComponent(id, Health, { current: 50 })
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+
+      // removeComponent tests
+      {
+        name: 'removeComponent: removes existing component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.addComponent(id, Position, { x: 10, y: 20 })
+          ecs.removeComponent(id, Position)
+          const data = ecs.getComponent(id, Position)
+          if (data !== null) throw new Error('Component not removed')
+        }
+      },
+      {
+        name: 'removeComponent: handles non-existent component gracefully',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.removeComponent(id, Position)
+          // Should not throw
+        }
+      },
+
+      // hasComponent tests
+      {
+        name: 'hasComponent: returns true for existing component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          ecs.addComponent(id, Position, { x: 10, y: 20 })
+          if (!ecs.hasComponent(id, Position)) throw new Error('hasComponent returned false')
+        }
+      },
+      {
+        name: 'hasComponent: returns false for missing component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const id = ecs.createEntity()
+          if (ecs.hasComponent(id, Position)) throw new Error('hasComponent returned true')
+        }
+      },
+
+      // Query tests
+      {
+        name: 'query: finds entities with single component',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position, Health])
+          await ecs.initialize()
+          const e1 = ecs.createEntity()
+          ecs.addComponent(e1, Position, { x: 0, y: 0 })
+          const e2 = ecs.createEntity()
+          ecs.addComponent(e2, Position, { x: 10, y: 10 })
+          const results = ecs.query([Position])
+          if (results.length !== 2) throw new Error(`Expected 2 entities, got ${results.length}`)
+          if (!results.includes(e1) || !results.includes(e2)) throw new Error('Missing entities')
+        }
+      },
+      {
+        name: 'query: finds entities with multiple components',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position, Health])
+          await ecs.initialize()
+          const e1 = ecs.createEntity()
+          ecs.addComponent(e1, Position, { x: 0, y: 0 })
+          ecs.addComponent(e1, Health, { current: 100, max: 100 })
+          const e2 = ecs.createEntity()
+          ecs.addComponent(e2, Position, { x: 10, y: 10 })
+          const results = ecs.query([Position, Health])
+          if (results.length !== 1) throw new Error(`Expected 1 entity, got ${results.length}`)
+          if (!results.includes(e1)) throw new Error('Wrong entity returned')
+        }
+      },
+      {
+        name: 'query: supports filter predicate',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Health])
+          await ecs.initialize()
+          const e1 = ecs.createEntity()
+          ecs.addComponent(e1, Health, { current: 30, max: 100 })
+          const e2 = ecs.createEntity()
+          ecs.addComponent(e2, Health, { current: 80, max: 100 })
+          const results = ecs.query([Health], { filter: (data) => data.current < 50 })
+          if (results.length !== 1) throw new Error(`Expected 1 entity, got ${results.length}`)
+          if (!results.includes(e1)) throw new Error('Filter did not work correctly')
+        }
+      },
+      {
+        name: 'query: supports exclude option',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position, Health])
+          await ecs.initialize()
+          const e1 = ecs.createEntity()
+          ecs.addComponent(e1, Position, { x: 0, y: 0 })
+          const e2 = ecs.createEntity()
+          ecs.addComponent(e2, Position, { x: 10, y: 10 })
+          ecs.addComponent(e2, Health, { current: 100, max: 100 })
+          const results = ecs.query([Position], { exclude: [Health] })
+          if (results.length !== 1) throw new Error(`Expected 1 entity, got ${results.length}`)
+          if (!results.includes(e1)) throw new Error('Exclude did not work correctly')
+        }
+      },
+
+      // queryWithData tests
+      {
+        name: 'queryWithData: returns entity IDs and component data',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position, Health])
+          await ecs.initialize()
+          const e1 = ecs.createEntity()
+          ecs.addComponent(e1, Position, { x: 5, y: 10 })
+          ecs.addComponent(e1, Health, { current: 75, max: 100 })
+          const results = ecs.queryWithData([Position, Health])
+          if (results.length !== 1) throw new Error(`Expected 1 result, got ${results.length}`)
+          const result = results[0]
+          if (result.entityId !== e1) throw new Error('Wrong entity ID')
+          if (result.Position.x !== 5 || result.Position.y !== 10) throw new Error('Wrong Position data')
+          if (result.Health.current !== 75 || result.Health.max !== 100) throw new Error('Wrong Health data')
+        }
+      },
+
+      // Event tests
+      {
+        name: 'onEntityCreated: fires when entity is created',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          let fired = false
+          let capturedId = null
+          const unsub = ecs.onEntityCreated((id) => {
+            fired = true
+            capturedId = id
+          })
+          const entityId = ecs.createEntity()
+          if (!fired) throw new Error('Event did not fire')
+          if (capturedId !== entityId) throw new Error('Wrong entity ID')
+          unsub()
+        }
+      },
+      {
+        name: 'onEntityDestroyed: fires when entity is destroyed',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [])
+          await ecs.initialize()
+          let fired = false
+          const entityId = ecs.createEntity()
+          const unsub = ecs.onEntityDestroyed((id) => {
+            fired = true
+            if (id !== entityId) throw new Error('Wrong entity ID')
+          })
+          ecs.destroyEntity(entityId)
+          if (!fired) throw new Error('Event did not fire')
+          unsub()
+        }
+      },
+      {
+        name: 'onComponentAdded: fires when component is added',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          let fired = false
+          const entityId = ecs.createEntity()
+          const unsub = ecs.onComponentAdded(Position, (id, data) => {
+            fired = true
+            if (id !== entityId) throw new Error('Wrong entity ID')
+            if (data.x !== 10 || data.y !== 20) throw new Error('Wrong data')
+          })
+          ecs.addComponent(entityId, Position, { x: 10, y: 20 })
+          if (!fired) throw new Error('Event did not fire')
+          unsub()
+        }
+      },
+      {
+        name: 'onComponentRemoved: fires when component is removed',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          let fired = false
+          const entityId = ecs.createEntity()
+          ecs.addComponent(entityId, Position, { x: 10, y: 20 })
+          const unsub = ecs.onComponentRemoved(Position, (id) => {
+            fired = true
+            if (id !== entityId) throw new Error('Wrong entity ID')
+          })
+          ecs.removeComponent(entityId, Position)
+          if (!fired) throw new Error('Event did not fire')
+          unsub()
+        }
+      },
+      {
+        name: 'onComponentUpdated: fires when component is updated',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Health])
+          await ecs.initialize()
+          let fired = false
+          const entityId = ecs.createEntity()
+          ecs.addComponent(entityId, Health, { current: 100, max: 100 })
+          const unsub = ecs.onComponentUpdated(Health, (id, oldData, newData) => {
+            fired = true
+            if (id !== entityId) throw new Error('Wrong entity ID')
+            if (oldData.current !== 100) throw new Error('Wrong old data')
+            if (newData.current !== 50) throw new Error('Wrong new data')
+          })
+          ecs.updateComponent(entityId, Health, { current: 50 })
+          if (!fired) throw new Error('Event did not fire')
+          unsub()
+        }
+      },
+
+      // Archetype tests
+      {
+        name: 'defineArchetype: creates archetype definition',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position, Health])
+          await ecs.initialize()
+          const archetype = ecs.defineArchetype([Position, Health])
+          if (!archetype.components) throw new Error('Archetype has no components')
+          if (archetype.components.length !== 2) throw new Error('Wrong component count')
+        }
+      },
+      {
+        name: 'createFromArchetype: creates entity with all components',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position, Health, Name])
+          await ecs.initialize()
+          const archetype = ecs.defineArchetype([Position, Health, Name])
+          const entityId = ecs.createFromArchetype(archetype, {
+            Position: { x: 10, y: 20 },
+            Health: { current: 100, max: 100 },
+            Name: { value: 'Player' }
+          })
+          if (!ecs.hasComponent(entityId, Position)) throw new Error('Missing Position')
+          if (!ecs.hasComponent(entityId, Health)) throw new Error('Missing Health')
+          if (!ecs.hasComponent(entityId, Name)) throw new Error('Missing Name')
+          const name = ecs.getComponent(entityId, Name)
+          if (name.value !== 'Player') throw new Error('Wrong name value')
+        }
+      },
+
+      // Index tests
+      {
+        name: 'addIndex: creates index on component field',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          ecs.addIndex(Position, 'x')
+          // Should not throw
+        }
+      },
+      {
+        name: 'addIndex: rejects invalid field name',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          try {
+            ecs.addIndex(Position, 'invalid')
+            throw new Error('Should have thrown ValidationError')
+          } catch (e) {
+            if (!(e instanceof ValidationError)) throw new Error('Expected ValidationError')
+          }
+        }
+      },
+
+      // Transaction tests
+      {
+        name: 'transaction: executes operations atomically',
+        fn: async () => {
+          const db = new MockDatabase()
+          const ecs = createECS(db, [Position])
+          await ecs.initialize()
+          const result = await ecs.transaction((txEcs) => {
+            const e1 = txEcs.createEntity()
+            const e2 = txEcs.createEntity()
+            txEcs.addComponent(e1, Position, { x: 0, y: 0 })
+            txEcs.addComponent(e2, Position, { x: 10, y: 10 })
+            return [e1, e2]
+          })
+          if (result.length !== 2) throw new Error('Transaction did not return result')
+          const entities = ecs.query([Position])
+          if (entities.length !== 2) throw new Error('Transaction did not persist')
+        }
+      },
+    ]
+
+    function logResult(name, status, error) {
+      const output = document.getElementById('test-output')
+      const className = status === 'PASS' ? 'test-pass' : 'test-fail'
+      const errorMsg = error ? ` - ${error}` : ''
+      output.innerHTML += `<div class="${className}">[${status}] ${name}${errorMsg}</div>`
+      output.scrollTop = output.scrollHeight
+    }
+
+    function logSummary(passed, failed) {
+      const summary = document.getElementById('summary')
+      const total = passed + failed
+      const className = failed === 0 ? 'test-pass' : 'test-fail'
+      summary.innerHTML = `<span class="${className}">Results: ${passed}/${total} tests passed</span>`
+    }
+
+    async function runAllTests() {
+      clearResults()
+      logResult('Starting test suite...', 'PASS')
+      let passed = 0, failed = 0
+      for (const test of tests) {
+        try {
+          await test.fn()
+          logResult(test.name, 'PASS')
+          passed++
+        } catch (e) {
+          logResult(test.name, 'FAIL', e.message)
+          failed++
+        }
+      }
+      logSummary(passed, failed)
+    }
+
+    function clearResults() {
+      document.getElementById('test-output').innerHTML = ''
+      document.getElementById('summary').innerHTML = ''
+    }
+
+    // Interactive demo functions
+    function createEntityManual() {
+      const customId = document.getElementById('entityId').value.trim() || undefined
+      try {
+        const entityId = demoECS.createEntity(customId)
+        document.getElementById('interactive-output').textContent =
+          `Created entity: ${entityId}`
+        document.getElementById('entityId').value = ''
+      } catch (e) {
+        document.getElementById('interactive-output').textContent =
+          `Error: ${e.message}`
+      }
+    }
+
+    function addComponentManual() {
+      const entityId = document.getElementById('addEntityId').value.trim()
+      const componentName = document.getElementById('componentSelect').value
+
+      if (!entityId) {
+        document.getElementById('interactive-output').textContent = 'Please enter an entity ID'
+        return
+      }
+
+      try {
+        let component, data
+        switch (componentName) {
+          case 'Position':
+            component = Position
+            data = { x: Math.random() * 100, y: Math.random() * 100 }
+            break
+          case 'Health':
+            component = Health
+            data = { current: 100, max: 100 }
+            break
+          case 'Name':
+            component = Name
+            data = { value: 'Entity-' + Math.floor(Math.random() * 1000) }
+            break
+        }
+
+        demoECS.addComponent(entityId, component, data)
+        document.getElementById('interactive-output').textContent =
+          `Added ${componentName} to ${entityId}:\n${JSON.stringify(data, null, 2)}`
+      } catch (e) {
+        document.getElementById('interactive-output').textContent =
+          `Error: ${e.message}`
+      }
+    }
+
+    function queryEntitiesManual() {
+      const queryType = document.getElementById('queryComponent').value
+
+      try {
+        let components, results
+        if (queryType.includes(',')) {
+          const names = queryType.split(',')
+          components = names.map(name => {
+            switch (name.trim()) {
+              case 'Position': return Position
+              case 'Health': return Health
+              case 'Name': return Name
+            }
+          })
+          results = demoECS.queryWithData(components)
+        } else {
+          switch (queryType) {
+            case 'Position': components = [Position]; break
+            case 'Health': components = [Health]; break
+            case 'Name': components = [Name]; break
+          }
+          results = demoECS.query(components)
+        }
+
+        document.getElementById('interactive-output').textContent =
+          `Found ${results.length} entities:\n${JSON.stringify(results, null, 2)}`
+      } catch (e) {
+        document.getElementById('interactive-output').textContent =
+          `Error: ${e.message}`
+      }
+    }
+
+    function setupEventListeners() {
+      // Clear existing listeners
+      eventUnsubscribers.forEach(unsub => unsub())
+      eventUnsubscribers = []
+
+      const log = document.getElementById('event-log')
+      log.textContent = 'Event logging enabled. Perform operations to see events...\n\n'
+
+      eventUnsubscribers.push(
+        demoECS.onEntityCreated((id) => {
+          log.textContent += `[EntityCreated] ${id}\n`
+          log.scrollTop = log.scrollHeight
+        })
+      )
+
+      eventUnsubscribers.push(
+        demoECS.onEntityDestroyed((id) => {
+          log.textContent += `[EntityDestroyed] ${id}\n`
+          log.scrollTop = log.scrollHeight
+        })
+      )
+
+      eventUnsubscribers.push(
+        demoECS.onComponentAdded(Position, (id, data) => {
+          log.textContent += `[ComponentAdded] Position on ${id}: ${JSON.stringify(data)}\n`
+          log.scrollTop = log.scrollHeight
+        })
+      )
+
+      eventUnsubscribers.push(
+        demoECS.onComponentAdded(Health, (id, data) => {
+          log.textContent += `[ComponentAdded] Health on ${id}: ${JSON.stringify(data)}\n`
+          log.scrollTop = log.scrollHeight
+        })
+      )
+
+      eventUnsubscribers.push(
+        demoECS.onComponentUpdated(Health, (id, oldData, newData) => {
+          log.textContent += `[ComponentUpdated] Health on ${id}\n  Old: ${JSON.stringify(oldData)}\n  New: ${JSON.stringify(newData)}\n`
+          log.scrollTop = log.scrollHeight
+        })
+      )
+    }
+
+    function clearEventLog() {
+      document.getElementById('event-log').textContent = 'Event log cleared.'
+    }
+  </script>
+</body>
+</html>

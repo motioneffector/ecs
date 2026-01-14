@@ -6,11 +6,23 @@ export default defineConfig({
   plugins: [
     dts({ include: ['src'] })
   ],
+  resolve: {
+    alias: {
+      '@motioneffector/sql': resolve(__dirname, '../sql/dist/index.js')
+    }
+  },
+  test: {
+    globals: false,
+    environment: 'node'
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       formats: ['es'],
       fileName: 'index'
+    },
+    rollupOptions: {
+      external: ['@motioneffector/sql']
     }
   }
 })
