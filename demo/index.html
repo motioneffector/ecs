@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>@motioneffector/ecs - Demo</title>
+  <link rel="stylesheet" href="demo-files/styles.css">
+</head>
+<body>
+  <!-- Demo Playback Banner (hidden by default) -->
+  <div class="demo-banner hidden" id="demo-banner">
+    <span class="demo-banner-text">Demo in progress...</span>
+    <button class="btn btn-small btn-secondary" id="skip-demo">Skip</button>
+  </div>
+
+  <!-- Demo Cursor (hidden by default) -->
+  <div class="demo-cursor hidden" id="demo-cursor"></div>
+
+  <div class="page">
+    <header class="header">
+      <div class="flex justify-between items-center">
+        <h1 class="header-title">@motioneffector/ecs</h1>
+        <button class="btn btn-secondary" id="reset-page">Reset Page</button>
+      </div>
+      <p class="header-description">A SQL-backed Entity Component System for game state management</p>
+      <nav class="header-links">
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link" target="_blank">
+          npm
+        </a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link" target="_blank">
+          GitHub
+        </a>
+        <a href="https://github.com/motioneffector/ecs/wiki" class="header-link" target="_blank">
+          Manual
+        </a>
+      </nav>
+    </header>
+
+    <main class="exhibits">
+      <!-- Exhibit 1: Entity-Component Playground -->
+      <section class="exhibit" id="exhibit-1-section">
+        <div class="exhibit-header">
+          <h2 class="exhibit-title">Entity-Component Playground</h2>
+          <p class="exhibit-description">Core ECS operations - creating entities, defining components, adding/updating/removing component data, destroying entities.</p>
+        </div>
+        <div class="exhibit-content">
+          <div class="exhibit-interactive" id="exhibit-1">
+            <div class="playground-layout">
+              <!-- Left: 2D Canvas World -->
+              <div class="playground-canvas-area">
+                <canvas id="world-canvas" width="400" height="300"></canvas>
+                <div class="canvas-coords" id="canvas-coords">(x: 0, y: 0)</div>
+                <div class="no-position-area" id="no-position-area">
+                  <div class="no-position-label">No Position</div>
+                  <div class="no-position-entities" id="no-position-entities"></div>
+                </div>
+              </div>
+              <!-- Right: Entity Inspector -->
+              <div class="entity-inspector" id="entity-inspector">
+                <div class="inspector-header">
+                  <span class="inspector-title">Entities</span>
+                  <span class="entity-count" id="entity-count">0 entities</span>
+                </div>
+                <div class="inspector-list" id="inspector-list">
+                  <!-- Entity cards populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="exhibit-controls">
+            <button class="btn btn-primary" id="new-entity">New Entity</button>
+            <div class="flex items-center gap-sm">
+              <input type="text" class="input input-mono" id="custom-entity-id" placeholder="custom-id">
+              <button class="btn btn-secondary" id="new-entity-with-id">New Entity with ID</button>
+            </div>
+            <button class="btn btn-secondary" id="reset-exhibit-1">Reset Exhibit</button>
+          </div>
+          <div class="exhibit-state">
+            <div class="exhibit-state-title">State</div>
+            <div class="playground-state">
+              <span class="component-stats" id="component-stats"></span>
+              <span class="last-action" id="last-action">Ready</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Exhibit 2: Query Explorer -->
+      <section class="exhibit" id="exhibit-2-section">
+        <div class="exhibit-header">
+          <h2 class="exhibit-title">Query Explorer</h2>
+          <p class="exhibit-description">Finding entities by component combinations, filtering by data values, excluding components.</p>
+        </div>
+        <div class="exhibit-content">
+          <div class="exhibit-interactive" id="exhibit-2">
+            <div class="query-layout">
+              <!-- Left: Query Canvas (mirrors exhibit 1) -->
+              <div class="query-canvas-area">
+                <canvas id="query-canvas" width="400" height="300"></canvas>
+              </div>
+              <!-- Right: Query Builder -->
+              <div class="query-builder" id="query-builder">
+                <div class="query-section">
+                  <div class="query-section-title">Required Components</div>
+                  <div class="query-checkboxes" id="required-components">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="req-position"> <span class="tag tag-blue">Position</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="req-health"> <span class="tag tag-red">Health</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="req-inventory"> <span class="tag tag-yellow">Inventory</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="query-section">
+                  <div class="query-section-title">Excluded Components</div>
+                  <div class="query-checkboxes" id="excluded-components">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="excl-position"> <span class="tag tag-blue">Position</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="excl-health"> <span class="tag tag-red">Health</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="excl-inventory"> <span class="tag tag-yellow">Inventory</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="query-section">
+                  <div class="query-section-title">Data Filters</div>
+                  <div class="filter-chips" id="filter-chips">
+                    <!-- Filters added by JS -->
+                  </div>
+                  <button class="btn btn-small btn-secondary" id="add-filter">+ Add Filter</button>
+                  <div class="filter-builder hidden" id="filter-builder">
+                    <select class="input" id="filter-component">
+                      <option value="Position">Position</option>
+                      <option value="Health">Health</option>
+                      <option value="Inventory">Inventory</option>
+                    </select>
+                    <select class="input" id="filter-field">
+                      <option value="x">x</option>
+                      <option value="y">y</option>
+                    </select>
+                    <select class="input" id="filter-operator">
+                      <option value="=">=</option>
+                      <option value="!=">!=</option>
+                      <option value=">">&gt;</option>
+                      <option value="<">&lt;</option>
+                      <option value=">=">&gt;=</option>
+                      <option value="<=">&lt;=</option>
+                    </select>
+                    <input type="text" class="input" id="filter-value" placeholder="value">
+                    <button class="btn btn-small btn-primary" id="apply-filter">Apply</button>
+                    <button class="btn btn-small btn-secondary" id="cancel-filter">Cancel</button>
+                  </div>
+                </div>
+                <div class="query-results">
+                  <div class="query-results-header">
+                    <span id="query-match-count">Matching: 0 of 0 entities</span>
+                    <span class="query-time" id="query-time">0ms</span>
+                  </div>
+                  <div class="query-results-list" id="query-results-list">
+                    <!-- Results populated by JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="exhibit-controls">
+            <button class="btn btn-secondary" id="clear-query">Clear Query</button>
+            <button class="btn btn-secondary" id="copy-query-code">Copy as Code</button>
+          </div>
+          <div class="exhibit-state">
+            <div class="exhibit-state-title">Generated Code</div>
+            <pre class="code-preview" id="query-code-preview">ecs.query([])</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Exhibit 3: Event Stream -->
+      <section class="exhibit" id="exhibit-3-section">
+        <div class="exhibit-header">
+          <h2 class="exhibit-title">Event Stream</h2>
+          <p class="exhibit-description">Subscribing to entity and component lifecycle events, seeing callbacks fire in real-time.</p>
+        </div>
+        <div class="exhibit-content">
+          <div class="exhibit-interactive" id="exhibit-3">
+            <div class="event-layout">
+              <!-- Left: Action Triggers -->
+              <div class="event-actions">
+                <div class="action-group">
+                  <div class="action-group-title">Entity Actions</div>
+                  <button class="btn btn-primary" id="evt-create-entity">Create Entity</button>
+                  <button class="btn btn-danger" id="evt-destroy-entity">Destroy Entity</button>
+                </div>
+                <div class="action-group">
+                  <div class="action-group-title">Component Actions</div>
+                  <button class="btn btn-secondary" id="evt-add-position">Add Position</button>
+                  <button class="btn btn-secondary" id="evt-add-health">Add Health</button>
+                  <button class="btn btn-secondary" id="evt-update-health">Update Health</button>
+                  <button class="btn btn-secondary" id="evt-remove-health">Remove Health</button>
+                </div>
+                <div class="action-group">
+                  <div class="action-group-title">Current Entity</div>
+                  <div class="current-entity-display" id="current-entity-display">None</div>
+                </div>
+              </div>
+              <!-- Right: Event Log -->
+              <div class="event-log-area">
+                <div class="event-filters">
+                  <label class="toggle">
+                    <input type="checkbox" id="filter-entity-created" checked>
+                    <span class="toggle-switch"></span>
+                    <span class="toggle-label">Entity Created</span>
+                  </label>
+                  <label class="toggle">
+                    <input type="checkbox" id="filter-entity-destroyed" checked>
+                    <span class="toggle-switch"></span>
+                    <span class="toggle-label">Entity Destroyed</span>
+                  </label>
+                  <label class="toggle">
+                    <input type="checkbox" id="filter-component-added" checked>
+                    <span class="toggle-switch"></span>
+                    <span class="toggle-label">Component Added</span>
+                  </label>
+                  <label class="toggle">
+                    <input type="checkbox" id="filter-component-removed" checked>
+                    <span class="toggle-switch"></span>
+                    <span class="toggle-label">Component Removed</span>
+                  </label>
+                  <label class="toggle">
+                    <input type="checkbox" id="filter-component-updated" checked>
+                    <span class="toggle-switch"></span>
+                    <span class="toggle-label">Component Updated</span>
+                  </label>
+                </div>
+                <div class="event-log" id="event-log">
+                  <!-- Event entries populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="exhibit-controls">
+            <button class="btn btn-secondary" id="clear-event-log">Clear Log</button>
+          </div>
+          <div class="exhibit-state">
+            <div class="exhibit-state-title">Subscriptions</div>
+            <div class="subscription-status">
+              <span id="subscription-count">Listening to 5 event types</span>
+              <span class="event-counter" id="event-counter">0 events captured</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Exhibit 4: Transaction Lab -->
+      <section class="exhibit" id="exhibit-4-section">
+        <div class="exhibit-header">
+          <h2 class="exhibit-title">Transaction Lab</h2>
+          <p class="exhibit-description">Atomic operations that either fully succeed or fully roll back on error.</p>
+        </div>
+        <div class="exhibit-content">
+          <div class="exhibit-interactive" id="exhibit-4">
+            <div class="transaction-layout">
+              <!-- Left: Before State -->
+              <div class="transaction-panel">
+                <div class="panel-header">Before</div>
+                <div class="panel-content" id="tx-before-state">
+                  <!-- State snapshot populated by JS -->
+                </div>
+              </div>
+              <!-- Center: Transaction Workspace -->
+              <div class="transaction-panel transaction-workspace">
+                <div class="panel-header">Transaction</div>
+                <div class="panel-content">
+                  <div class="operation-queue" id="operation-queue">
+                    <div class="queue-empty">No operations queued</div>
+                  </div>
+                  <div class="transaction-controls">
+                    <button class="btn btn-primary" id="start-transaction">Start Transaction</button>
+                    <div class="transaction-op-buttons hidden" id="tx-op-buttons">
+                      <button class="btn btn-small btn-secondary" id="tx-create-entity">+ Create Entity</button>
+                      <button class="btn btn-small btn-secondary" id="tx-add-component">+ Add Component</button>
+                      <button class="btn btn-small btn-secondary" id="tx-update-component">+ Update Component</button>
+                      <button class="btn btn-small btn-secondary" id="tx-remove-component">+ Remove Component</button>
+                      <button class="btn btn-small btn-secondary" id="tx-destroy-entity">+ Destroy Entity</button>
+                    </div>
+                    <div class="transaction-commit-buttons hidden" id="tx-commit-buttons">
+                      <button class="btn btn-success" id="tx-commit">Commit</button>
+                      <button class="btn btn-danger" id="tx-rollback">Trigger Error & Rollback</button>
+                      <button class="btn btn-secondary" id="tx-cancel">Cancel</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: After State -->
+              <div class="transaction-panel">
+                <div class="panel-header">After</div>
+                <div class="panel-content" id="tx-after-state">
+                  <!-- State populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="exhibit-state">
+            <div class="exhibit-state-title">Transaction Status</div>
+            <div class="transaction-status" id="transaction-status">No active transaction</div>
+            <div class="transaction-message hidden" id="transaction-message"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="test-runner">
+      <div class="test-runner-header">
+        <h2 class="test-runner-title">Test Suite</h2>
+        <div class="test-runner-actions">
+          <button class="btn btn-primary" id="run-tests">Run All Tests</button>
+          <button class="btn btn-secondary" id="run-fuzz">Run Fuzz Tests</button>
+        </div>
+      </div>
+      <div class="test-runner-content">
+        <div class="test-progress">
+          <div class="test-progress-bar">
+            <div class="test-progress-fill" id="progress-fill"></div>
+          </div>
+          <div class="test-progress-text" id="progress-text">Ready to run tests</div>
+        </div>
+        <div class="test-output" id="test-output">
+          <div class="test-output-empty">Click "Run All Tests" to execute the test suite</div>
+        </div>
+        <div class="test-summary hidden" id="test-summary">
+          <div class="test-summary-item passed">
+            <span>✓</span>
+            <span id="passed-count">0</span> passed
+          </div>
+          <div class="test-summary-item failed">
+            <span>✗</span>
+            <span id="failed-count">0</span> failed
+          </div>
+          <div class="test-summary-item skipped">
+            <span>○</span>
+            <span id="skipped-count">0</span> skipped
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Import demo modules -->
+  <script type="module">
+    import { initExhibits, getECS, getComponents } from './demo-files/exhibits.js';
+    import { initTestRunner } from './demo-files/test-runner.js';
+
+    // Initialize exhibits with shared ECS instance
+    await initExhibits();
+
+    // Initialize test runner
+    initTestRunner(getECS(), getComponents());
+
+    // Reset page button
+    document.getElementById('reset-page').addEventListener('click', () => {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>
