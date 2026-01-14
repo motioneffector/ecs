@@ -5,6 +5,44 @@ import { ValidationError, DatabaseError } from './errors'
 import type { Database } from '@motioneffector/sql'
 
 // Mock database for testing
+
+// Helper to extract field names from INSERT statement
+function extractFieldNames(sql: string): string[] {
+  // Match: INSERT INTO tablename (entity_id, field1, field2, ...) VALUES ...
+  // Handle both quoted and unquoted table names
+  const match = sql.match(/INSERT INTO "?\w+"?\s*\(([^)]+)\)/)
+  if (match) {
+    return match[1].split(',').map(f => {
+      const trimmed = f.trim()
+      // Remove surrounding quotes if present (e.g., "entity_id" -> entity_id)
+      if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+        return trimmed.slice(1, -1).replace(/""/g, '"') // Also unescape doubled quotes
+      }
+      return trimmed
+    })
+  }
+  return []
+}
+
+// Helper to extract SET clause fields from UPDATE
+function extractUpdateFields(sql: string): string[] {
+  // Match: UPDATE table SET field1 = ?, field2 = ? WHERE ...
+  const match = sql.match(/SET\s+(.+?)\s+WHERE/)
+  if (match) {
+    const setClause = match[1]
+    return setClause.split(',').map(part => {
+      // Match either quoted or unquoted identifiers
+      const fieldMatch = part.trim().match(/^"([^"]+)"\s*=|^(\w+)\s*=/)
+      if (fieldMatch) {
+        // Return the first capturing group that matched (quoted or unquoted)
+        return fieldMatch[1] || fieldMatch[2]
+      }
+      return ''
+    }).filter(Boolean)
+  }
+  return []
+}
+
 function createTestDatabase(): Database {
   const entities = new Map<string, { id: string; created_at: number }>()
   const componentTables = new Map<string, Map<string, Record<string, unknown>>>()
@@ -25,19 +63,26 @@ function createTestDatabase(): Database {
       }
 
       // Handle INSERT INTO component tables
-      if (sqlStr.includes('INSERT INTO component_')) {
-        const match = sqlStr.match(/INSERT INTO (component_\w+)/)
-        if (match) {
-          const tableName = match[1]
+      if (sqlStr.includes('INSERT INTO component_') || sqlStr.includes('INSERT INTO "component_')) {
+        // Match either quoted or unquoted table names
+        const tableMatch = sqlStr.match(/INSERT INTO "?(component_\w+)"?/)
+        if (tableMatch) {
+          const tableName = tableMatch[1]
           if (!componentTables.has(tableName)) {
             componentTables.set(tableName, new Map())
           }
           const table = componentTables.get(tableName)!
           const paramsArray = Array.isArray(params) ? params : []
+
+          // Extract field names from the SQL
+          const fieldNames = extractFieldNames(sqlStr)
+
           const entityId = paramsArray[0] as string
-          const data: Record<string, unknown> = { entity_id: entityId }
-          for (let i = 1; i < paramsArray.length; i++) {
-            data[`field${i}`] = paramsArray[i]
+
+          // Store data with proper field names
+          const data: Record<string, unknown> = {}
+          for (let i = 0; i < fieldNames.length; i++) {
+            data[fieldNames[i]] = paramsArray[i]
           }
           table.set(entityId, data)
           return { changes: 1, lastInsertRowId: 1 }
@@ -58,8 +103,8 @@ function createTestDatabase(): Database {
       }
 
       // Handle DELETE FROM component tables
-      if (sqlStr.includes('DELETE FROM component_')) {
-        const match = sqlStr.match(/DELETE FROM (component_\w+)/)
+      if (sqlStr.includes('DELETE FROM component_') || sqlStr.includes('DELETE FROM "component_')) {
+        const match = sqlStr.match(/DELETE FROM "?(component_\w+)"?/)
         if (match) {
           const tableName = match[1]
           const table = componentTables.get(tableName)
@@ -74,8 +119,8 @@ function createTestDatabase(): Database {
       }
 
       // Handle UPDATE component tables
-      if (sqlStr.includes('UPDATE component_')) {
-        const match = sqlStr.match(/UPDATE (component_\w+)/)
+      if (sqlStr.includes('UPDATE component_') || sqlStr.includes('UPDATE "component_')) {
+        const match = sqlStr.match(/UPDATE "?(component_\w+)"?/)
         if (match) {
           const tableName = match[1]
           const table = componentTables.get(tableName)
@@ -85,12 +130,14 @@ function createTestDatabase(): Database {
             const existing = table.get(entityId)
             if (existing) {
               const updated = { ...existing }
-              for (let i = 0; i < paramsArray.length - 1; i++) {
-                updated[`field${i}`] = paramsArray[i]
+              const updateFields = extractUpdateFields(sqlStr)
+              for (let i = 0; i < updateFields.length; i++) {
+                updated[updateFields[i]] = paramsArray[i]
               }
               table.set(entityId, updated)
               return { changes: 1, lastInsertRowId: 0 }
             }
+            return { changes: 0, lastInsertRowId: 0 }
           }
         }
       }
@@ -110,8 +157,8 @@ function createTestDatabase(): Database {
       }
 
       // Handle SELECT FROM component tables
-      if (sqlStr.includes('FROM component_')) {
-        const match = sqlStr.match(/FROM (component_\w+)/)
+      if (sqlStr.includes('FROM component_') || sqlStr.includes('FROM "component_')) {
+        const match = sqlStr.match(/FROM "?(component_\w+)"?/)
         if (match) {
           const tableName = match[1]
           const table = componentTables.get(tableName)
