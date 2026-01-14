@@ -1840,11 +1840,16 @@ describe('Advanced Integration Tests', () => {
         await ecs.addComponent(id, Comp, { value: i })
       }
 
+      // Verify we have entities before closing
+      const beforeClose = await ecs.query([Comp])
+      expect(beforeClose.length).toBe(100)
+
       // Close database
       db.close()
 
-      // Should not be able to perform operations
-      expect(true).toBe(true) // Placeholder - database is closed
+      // After close, operations should fail or database should be unusable
+      // We verify cleanup by checking the database is closed
+      expect(() => db.getTables()).toThrow()
     })
 
     it('re-initializing ECS preserves existing data', async () => {
@@ -2206,15 +2211,11 @@ describe('Data Integrity Tests', () => {
     it('schema cannot be modified after definition', () => {
       const Comp = defineComponent('Test', { value: 'number' })
 
-      // Try to modify schema
-      try {
+      // Try to modify schema - should throw or be prevented by Object.freeze
+      expect(() => {
         // @ts-expect-error - Testing runtime immutability
         Comp.schema.value = 'string'
-        expect.fail('Should have thrown or been prevented')
-      } catch (error) {
-        // Expected
-        expect(true).toBe(true)
-      }
+      }).toThrow()
 
       // Verify original schema unchanged
       expect(Comp.schema.value).toBe('number')
