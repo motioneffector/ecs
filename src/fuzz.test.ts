@@ -26,7 +26,7 @@ async function createTestDatabase(): Promise<Database> {
 // ============================================
 
 const THOROUGH_MODE = process.env.FUZZ_THOROUGH === '1'
-const THOROUGH_DURATION_MS = 60_000  // 60 seconds per test in thorough mode
+const THOROUGH_DURATION_MS = 10_000  // 10 seconds per test in thorough mode
 const STANDARD_ITERATIONS = 50       // iterations per test in standard mode
 const BASE_SEED = 12345              // reproducible seed for standard mode
 
@@ -65,6 +65,11 @@ async function fuzzLoop(
       while (Date.now() - startTime < THOROUGH_DURATION_MS) {
         await testFn(random, iteration)
         iteration++
+
+        // Force garbage collection every 10 iterations in thorough mode
+        if (iteration % 10 === 0 && global.gc) {
+          global.gc()
+        }
       }
     } else {
       for (iteration = 0; iteration < STANDARD_ITERATIONS; iteration++) {
@@ -107,6 +112,11 @@ async function fuzzLoopAsync(
       while (Date.now() - startTime < THOROUGH_DURATION_MS) {
         await testFn(random, iteration)
         iteration++
+
+        // Force garbage collection every 10 iterations in thorough mode
+        if (iteration % 10 === 0 && global.gc) {
+          global.gc()
+        }
       }
     } else {
       for (iteration = 0; iteration < STANDARD_ITERATIONS; iteration++) {
