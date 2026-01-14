@@ -541,8 +541,9 @@ export function createECS(
         const filterFn = options.filter
         entityIds = entityIds.filter(entityId => {
           // Single component: unwrap data to match TypeScript types
-          if (components.length === 1) {
-            const componentData = ecs.getComponent(entityId, components[0])
+          if (components.length === 1 && components[0]) {
+            const component = components[0]
+            const componentData = ecs.getComponent(entityId, component)
             return componentData !== null && filterFn(componentData)
           }
 
@@ -554,7 +555,7 @@ export function createECS(
               data[component.name] = componentData
             }
           }
-          return filterFn(data)
+          return filterFn(data as InferComponentData<T>)
         })
       }
 

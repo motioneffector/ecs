@@ -17,7 +17,13 @@
     "entity-component-system",
     "game-development",
     "sqlite",
-    "typescript"
+    "typescript",
+    "persistent",
+    "database",
+    "game-engine",
+    "entity",
+    "component",
+    "sql"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -30,7 +36,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
   "engines": {
