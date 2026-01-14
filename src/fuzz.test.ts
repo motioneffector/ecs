@@ -1803,6 +1803,147 @@ describe('Security: SQL injection prevention', () => {
   })
 })
 
+describe('Security: Prototype pollution prevention', () => {
+  // Helper to clean up any prototype pollution from other tests
+  function cleanupPrototypePollution() {
+    delete (Object.prototype as any).polluted
+    delete (Object.prototype as any).nested_polluted
+    delete (Object.prototype as any).hacked
+    delete (Array.prototype as any).polluted
+  }
+
+  it('rejects __proto__ key in component data via JSON.parse', async () => {
+    cleanupPrototypePollution()
+    const db = await createTestDatabase()
+    const Config = defineComponent('Config', { name: 'string', value: 'number' })
+    const ecs = createECS(db, [Config])
+    await ecs.initialize()
+
+    const entity = await ecs.createEntity()
+
+    // JSON.parse creates __proto__ as an own property, unlike object literals
+    const maliciousData = JSON.parse('{"__proto__": {"polluted": true}, "name": "test", "value": 42}')
+
+    // Should reject the data due to __proto__ key
+    await expect(async () => {
+      await ecs.addComponent(entity, Config, maliciousData)
+    }).rejects.toThrow(ValidationError)
+
+    // Verify the rejection happened before any prototype access could occur
+    // (prototype may still be polluted from other tests, but this test verifies rejection)
+    db.close()
+  })
+
+  it('rejects constructor key in component data', async () => {
+    cleanupPrototypePollution()
+    const db = await createTestDatabase()
+    const Config = defineComponent('Config', { name: 'string' })
+    const ecs = createECS(db, [Config])
+    await ecs.initialize()
+
+    const entity = await ecs.createEntity()
+    const maliciousData = JSON.parse('{"constructor": {"prototype": {"polluted": true}}, "name": "test"}')
+
+    await expect(async () => {
+      await ecs.addComponent(entity, Config, maliciousData)
+    }).rejects.toThrow(ValidationError)
+
+    db.close()
+  })
+
+  it('rejects prototype key in component data', async () => {
+    cleanupPrototypePollution()
+    const db = await createTestDatabase()
+    const Config = defineComponent('Config', { name: 'string' })
+    const ecs = createECS(db, [Config])
+    await ecs.initialize()
+
+    const entity = await ecs.createEntity()
+    const maliciousData = JSON.parse('{"prototype": {"polluted": true}, "name": "test"}')
+
+    await expect(async () => {
+      await ecs.addComponent(entity, Config, maliciousData)
+    }).rejects.toThrow(ValidationError)
+
+    db.close()
+  })
+
+  it('rejects __proto__ in updateComponent', async () => {
+    cleanupPrototypePollution()
+    const db = await createTestDatabase()
+    const Config = defineComponent('Config', { name: 'string', value: 'number' })
+    const ecs = createECS(db, [Config])
+    await ecs.initialize()
+
+    const entity = await ecs.createEntity()
+    await ecs.addComponent(entity, Config, { name: 'safe', value: 1 })
+
+    // Try to update with malicious data
+    const maliciousUpdate = JSON.parse('{"__proto__": {"polluted": true}, "value": 999}')
+
+    await expect(async () => {
+      await ecs.updateComponent(entity, Config, maliciousUpdate)
+    }).rejects.toThrow(ValidationError)
+
+    // Verify original data unchanged
+    const data = await ecs.getComponent(entity, Config)
+    expect(data?.value).toBe(1)
+
+    db.close()
+  })
+
+  it('validates using Object.hasOwn not in operator', async () => {
+    cleanupPrototypePollution()
+    const db = await createTestDatabase()
+    // Create a component where 'toString' would exist via prototype if using 'in'
+    const Config = defineComponent('Config', { name: 'string' })
+    const ecs = createECS(db, [Config])
+    await ecs.initialize()
+
+    const entity = await ecs.createEntity()
+
+    // 'toString' exists on Object.prototype, so 'toString' in schema would be true
+    // but Object.hasOwn(schema, 'toString') is false
+    const maliciousData = { name: 'valid', toString: 'should be rejected' }
+
+    await expect(async () => {
+      await ecs.addComponent(entity, Config, maliciousData as any)
+    }).rejects.toThrow(ValidationError)
+
+    db.close()
+  })
+
+  it('prevents nested prototype pollution via JSON fields', async () => {
+    cleanupPrototypePollution()
+    const db = await createTestDatabase()
+    const Metadata = defineComponent('Metadata', { data: 'json' })
+    const ecs = createECS(db, [Metadata])
+    await ecs.initialize()
+
+    const entity = await ecs.createEntity()
+
+    // This stores malicious JSON but doesn't execute it
+    // The key test is that storing and retrieving doesn't pollute prototypes
+    const nestedMalicious = {
+      data: JSON.parse('{"__proto__": {"nested_polluted": true}}')
+    }
+
+    await ecs.addComponent(entity, Metadata, nestedMalicious)
+
+    // Retrieve the data
+    const retrieved = await ecs.getComponent(entity, Metadata)
+
+    // The nested __proto__ should be stored as a regular property, not pollute prototype
+    expect((Object.prototype as any).nested_polluted).toBeUndefined()
+    expect(({} as any).nested_polluted).toBeUndefined()
+
+    // The data should be retrievable as stored (JSON serialization normalizes __proto__)
+    expect(retrieved?.data).toBeDefined()
+
+    db.close()
+  })
+})
+
 describe('Security: Resource exhaustion prevention', () => {
   it('handles creation of many entities', async () => {
     const db = await createTestDatabase()
