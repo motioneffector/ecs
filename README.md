@@ -19,7 +19,7 @@ A SQL-backed Entity Component System that brings database persistence, ACID guar
 - **Archetype Support** - Pre-define entity templates for common patterns
 - **Bulk Operations** - Efficient batch add/remove for multiple entities
 
-[Read the full manual →](https://github.com/motioneffector/ecs/wiki)
+[Read the full manual →](https://motioneffector.github.io/ecs/manual/)
 
 ## Quick Start
 
