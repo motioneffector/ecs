@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced API - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Advanced API</h1>
+<p>Functions for transactions, archetypes, and indexes.</p>
+<hr>
+<h2><code>ECS.transaction()</code></h2>
+<p>Executes multiple operations atomically. If any operation fails, all changes roll back.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">transaction&lt;T&gt;(callback: TransactionCallback&lt;T&gt;): Promise&lt;T&gt;
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>callback</code></td>
+<td><code>TransactionCallback&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Async function that performs operations</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>Promise&lt;T&gt;</code> — The value returned from the callback.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">// Basic transaction
+await ecs.transaction(async (ecs) =&gt; {
+  const entity = ecs.createEntity()
+  ecs.addComponent(entity, Position, { x: 0, y: 0 })
+  ecs.addComponent(entity, Health, { current: 100, max: 100 })
+})
+
+// With return value
+const newId = await ecs.transaction(async (ecs) =&gt; {
+  const entity = ecs.createEntity()
+  ecs.addComponent(entity, Position, { x: 0, y: 0 })
+  return entity
+})
+
+// Automatic rollback on error
+try {
+  await ecs.transaction(async (ecs) =&gt; {
+    ecs.createEntity(&#39;test&#39;)
+    throw new Error(&#39;Oops&#39;)  // Entity creation rolled back
+  })
+} catch (e) {
+  // Entity &#39;test&#39; does not exist
+}
+</code></pre>
+<hr>
+<h2><code>ECS.defineArchetype()</code></h2>
+<p>Defines an archetype (entity template) from a set of components.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">defineArchetype(
+  components: readonly ComponentDefinition[]
+): ArchetypeDefinition
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>components</code></td>
+<td><code>ComponentDefinition[]</code></td>
+<td>Yes</td>
+<td>Components that make up the archetype</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>ArchetypeDefinition</code> — The archetype definition.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const CharacterArchetype = ecs.defineArchetype([
+  Position,
+  Health,
+  Velocity
+])
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Component not registered with ECS</li>
+</ul>
+<hr>
+<h2><code>ECS.createFromArchetype()</code></h2>
+<p>Creates an entity with all components defined in an archetype.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">createFromArchetype&lt;T extends readonly ComponentDefinition[]&gt;(
+  archetype: ArchetypeDefinition,
+  data: ArchetypeData&lt;T&gt;
+): EntityId
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>archetype</code></td>
+<td><code>ArchetypeDefinition</code></td>
+<td>Yes</td>
+<td>The archetype to instantiate</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>ArchetypeData&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Data for each component, keyed by name</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>EntityId</code> — The created entity ID.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const CharacterArchetype = ecs.defineArchetype([Position, Health, Velocity])
+
+const player = ecs.createFromArchetype(CharacterArchetype, {
+  Position: { x: 100, y: 100 },
+  Health: { current: 100, max: 100 },
+  Velocity: { vx: 0, vy: 0 }
+})
+
+// player now has all three components
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Missing data for a component in the archetype</li>
+</ul>
+<hr>
+<h2><code>ECS.addIndex()</code></h2>
+<p>Adds a database index on a component field to speed up queries.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">addIndex&lt;T extends ComponentSchema&gt;(
+  component: ComponentDefinition&lt;T&gt;,
+  field: keyof InferComponentData&lt;T&gt;
+): void
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Component to index</td>
+</tr>
+<tr>
+<td><code>field</code></td>
+<td><code>keyof InferComponentData&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Field name to index</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>void</code></p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">// Index frequently-queried fields
+ecs.addIndex(Position, &#39;x&#39;)
+ecs.addIndex(Position, &#39;y&#39;)
+ecs.addIndex(Team, &#39;name&#39;)
+
+// Queries filtering on these fields will be faster
+const enemies = ecs.rawQuery(
+  `SELECT entity_id FROM &quot;component_Team&quot; WHERE name = ?`,
+  [&#39;enemy&#39;]
+)
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Component not registered with ECS</li>
+<li><code>ValidationError</code> — Field does not exist in component schema</li>
+<li><code>DatabaseError</code> — Index creation fails</li>
+</ul>
+<hr>
+<h2>Types</h2>
+<h3><code>TransactionCallback&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">type TransactionCallback&lt;T&gt; = (ecs: ECS) =&gt; T | Promise&lt;T&gt;
+</code></pre>
+<p>Function passed to <code>transaction()</code>. Receives the ECS instance and can return a value.</p>
+<h3><code>ArchetypeDefinition</code></h3>
+<pre><code class="language-typescript">interface ArchetypeDefinition {
+  readonly components: readonly ComponentDefinition[]
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>components</code></td>
+<td><code>ComponentDefinition[]</code></td>
+<td>The components in this archetype</td>
+</tr>
+</tbody></table>
+<h3><code>ArchetypeData&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">type ArchetypeData&lt;T extends readonly ComponentDefinition[]&gt; = {
+  [K in T[number][&#39;name&#39;]]: InferComponentData&lt;Extract&lt;T[number], { name: K }&gt;[&#39;schema&#39;]&gt;
+}
+</code></pre>
+<p>Object providing data for each component in an archetype, keyed by component name.</p>
+<pre><code class="language-typescript">// For archetype with Position and Health:
+{
+  Position: { x: 0, y: 0 },
+  Health: { current: 100, max: 100 }
+}
+</code></pre>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

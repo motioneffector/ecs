@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Queries API - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Queries API</h1>
+<p>Functions for finding entities by their components.</p>
+<hr>
+<h2><code>ECS.query()</code></h2>
+<p>Finds entities that have all specified components. Returns entity IDs.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">query&lt;T extends ComponentSchema&gt;(
+  components: ComponentDefinition&lt;T&gt;[],
+  options?: QueryOptions&lt;T&gt;
+): EntityId[]
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>components</code></td>
+<td><code>ComponentDefinition&lt;T&gt;[]</code></td>
+<td>Yes</td>
+<td>Components entities must have (AND logic)</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>QueryOptions&lt;T&gt;</code></td>
+<td>No</td>
+<td>Filter and exclude options</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>EntityId[]</code> — Array of matching entity IDs.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">// All entities with Position
+const moveable = ecs.query([Position])
+
+// Entities with both Position AND Health
+const characters = ecs.query([Position, Health])
+
+// All entities (empty component array)
+const allEntities = ecs.query([])
+
+// With filter
+const lowHealth = ecs.query([Health], {
+  filter: (data) =&gt; data.current &lt; 25
+})
+
+// With exclusion
+const npcs = ecs.query([Position, Health], {
+  exclude: [PlayerControlled]
+})
+</code></pre>
+<hr>
+<h2><code>ECS.queryWithData()</code></h2>
+<p>Finds entities and returns them with their component data attached. Avoids separate getComponent calls.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">queryWithData&lt;T extends ComponentDefinition[]&gt;(
+  components: T,
+  options?: QueryOptions&lt;T[number][&#39;schema&#39;]&gt;
+): QueryResult&lt;T&gt;[]
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>components</code></td>
+<td><code>T</code></td>
+<td>Yes</td>
+<td>Components to query and return data for</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>QueryOptions</code></td>
+<td>No</td>
+<td>Filter and exclude options</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>QueryResult&lt;T&gt;[]</code> — Array of objects with entityId and component data.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const results = ecs.queryWithData([Position, Health])
+
+for (const result of results) {
+  console.log(`Entity: ${result.entityId}`)
+  console.log(`  Position: (${result.Position.x}, ${result.Position.y})`)
+  console.log(`  Health: ${result.Health.current}/${result.Health.max}`)
+}
+</code></pre>
+<hr>
+<h2><code>ECS.rawQuery()</code></h2>
+<p>Executes a raw SQL query against the database. For advanced queries that can&#39;t be expressed with query().</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">rawQuery&lt;T = Record&lt;string, unknown&gt;&gt;(
+  sql: string,
+  params?: unknown[]
+): T[]
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sql</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>SQL query string</td>
+</tr>
+<tr>
+<td><code>params</code></td>
+<td><code>unknown[]</code></td>
+<td>No</td>
+<td>Parameter values for placeholders</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>T[]</code> — Array of result rows.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">// Find entities with x &gt; 100
+const results = ecs.rawQuery&lt;{ entity_id: string; x: number }&gt;(
+  `SELECT entity_id, x FROM &quot;component_Position&quot; WHERE x &gt; ?`,
+  [100]
+)
+
+// Join multiple component tables
+const query = `
+  SELECT p.entity_id, p.x, p.y, h.current, h.max
+  FROM &quot;component_Position&quot; p
+  JOIN &quot;component_Health&quot; h ON p.entity_id = h.entity_id
+  WHERE h.current &lt; h.max * 0.5
+`
+const damaged = ecs.rawQuery(query)
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>DatabaseError</code> — SQL execution fails</li>
+</ul>
+<hr>
+<h2>Types</h2>
+<h3><code>QueryOptions&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">interface QueryOptions&lt;T extends ComponentSchema&gt; {
+  filter?: (data: InferComponentData&lt;T&gt;) =&gt; boolean
+  exclude?: ComponentDefinition[]
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>filter</code></td>
+<td><code>(data) =&gt; boolean</code></td>
+<td>Predicate to filter results by component data</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td><code>ComponentDefinition[]</code></td>
+<td>Components that matching entities must NOT have</td>
+</tr>
+</tbody></table>
+<h3><code>QueryResult&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">type QueryResult&lt;T extends ComponentDefinition[]&gt; = {
+  entityId: EntityId
+} &amp; {
+  [K in T[number][&#39;name&#39;]]: InferComponentData&lt;Extract&lt;T[number], { name: K }&gt;[&#39;schema&#39;]&gt;
+}
+</code></pre>
+<p>Result object from queryWithData(), containing the entity ID and data for each queried component keyed by component name.</p>
+<pre><code class="language-typescript">// For queryWithData([Position, Health]):
+{
+  entityId: &quot;player-1&quot;,
+  Position: { x: 100, y: 200 },
+  Health: { current: 80, max: 100 }
+}
+</code></pre>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

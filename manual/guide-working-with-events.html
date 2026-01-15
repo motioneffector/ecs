@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Working with Events - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Working with Events</h1>
+<p>This guide shows you how to use the ECS event system to react to entity and component changes without polling.</p>
+<h2>Prerequisites</h2>
+<p>Before starting, you should:</p>
+<ul>
+<li><a href="concept-entities.html">Understand what entities are</a></li>
+<li><a href="concept-components.html">Understand what components are</a></li>
+</ul>
+<h2>Overview</h2>
+<p>We&#39;ll cover:</p>
+<ol>
+<li>Subscribing to entity lifecycle events</li>
+<li>Subscribing to component lifecycle events</li>
+<li>Managing subscriptions properly</li>
+<li>Handling errors in callbacks</li>
+</ol>
+<h2>Step 1: Subscribe to Entity Events</h2>
+<p>Entity events fire when entities are created or destroyed, regardless of their components.</p>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+
+const db = await createDatabase()
+const ecs = createECS(db, [Position])
+await ecs.initialize()
+
+// Subscribe to entity creation
+const unsubCreate = ecs.onEntityCreated((entityId) =&gt; {
+  console.log(`Entity created: ${entityId}`)
+})
+
+// Subscribe to entity destruction
+const unsubDestroy = ecs.onEntityDestroyed((entityId) =&gt; {
+  console.log(`Entity destroyed: ${entityId}`)
+})
+
+// Test it
+const entity = ecs.createEntity()  // logs: &quot;Entity created: ...&quot;
+ecs.destroyEntity(entity)          // logs: &quot;Entity destroyed: ...&quot;
+</code></pre>
+<p>The callback receives the entity ID that was created or destroyed.</p>
+<h2>Step 2: Subscribe to Component Events</h2>
+<p>Component events are specific to a component type. You subscribe to Health events separately from Position events.</p>
+<pre><code class="language-typescript">const Health = defineComponent(&#39;Health&#39;, { current: &#39;number&#39;, max: &#39;number&#39; })
+
+// When Health is added to any entity
+ecs.onComponentAdded(Health, (entityId, data) =&gt; {
+  console.log(`${entityId} gained health: ${data.current}/${data.max}`)
+})
+
+// When Health is updated on any entity
+ecs.onComponentUpdated(Health, (entityId, oldData, newData) =&gt; {
+  if (newData.current &lt; oldData.current) {
+    console.log(`${entityId} took ${oldData.current - newData.current} damage`)
+  } else if (newData.current &gt; oldData.current) {
+    console.log(`${entityId} healed ${newData.current - oldData.current} HP`)
+  }
+})
+
+// When Health is removed from any entity
+ecs.onComponentRemoved(Health, (entityId) =&gt; {
+  console.log(`${entityId} lost their Health component`)
+})
+</code></pre>
+<p>Note: <code>onComponentAdded</code> and <code>onComponentUpdated</code> receive component data, but <code>onComponentRemoved</code> only receives the entity ID (the data is already gone).</p>
+<h2>Step 3: Manage Subscriptions</h2>
+<p>Every subscription method returns an unsubscribe function. Call it when you no longer need notifications.</p>
+<pre><code class="language-typescript">// Store subscriptions for later cleanup
+const subscriptions: Array&lt;() =&gt; void&gt; = []
+
+function setupEventHandlers() {
+  subscriptions.push(
+    ecs.onEntityCreated((id) =&gt; {
+      // Handle creation
+    })
+  )
+
+  subscriptions.push(
+    ecs.onComponentAdded(Health, (id, data) =&gt; {
+      // Handle health added
+    })
+  )
+
+  subscriptions.push(
+    ecs.onComponentUpdated(Health, (id, old, current) =&gt; {
+      // Handle health changed
+    })
+  )
+}
+
+function cleanupEventHandlers() {
+  for (const unsubscribe of subscriptions) {
+    unsubscribe()
+  }
+  subscriptions.length = 0
+}
+
+// Usage
+setupEventHandlers()
+// ... game runs ...
+cleanupEventHandlers()  // When done
+</code></pre>
+<h2>Step 4: Handle Errors Gracefully</h2>
+<p>If your event handler throws an error, the ECS catches it and logs to console. Other handlers still run, and the operation that triggered the event still completes.</p>
+<pre><code class="language-typescript">// This handler throws
+ecs.onEntityCreated(() =&gt; {
+  throw new Error(&#39;Handler error!&#39;)
+})
+
+// This handler still runs
+ecs.onEntityCreated((id) =&gt; {
+  console.log(`Entity ${id} created successfully`)
+})
+
+// Both handlers are called, error is logged, entity is created
+const entity = ecs.createEntity()
+</code></pre>
+<p>This prevents buggy event handlers from breaking your game, but you should still fix the underlying issue.</p>
+<h2>Complete Example</h2>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+const Health = defineComponent(&#39;Health&#39;, { current: &#39;number&#39;, max: &#39;number&#39; })
+
+const db = await createDatabase()
+const ecs = createECS(db, [Position, Health])
+await ecs.initialize()
+
+// Track all subscriptions
+const subs: Array&lt;() =&gt; void&gt; = []
+
+// Entity events
+subs.push(ecs.onEntityCreated((id) =&gt; {
+  console.log(`[EVENT] Entity created: ${id}`)
+}))
+
+subs.push(ecs.onEntityDestroyed((id) =&gt; {
+  console.log(`[EVENT] Entity destroyed: ${id}`)
+}))
+
+// Health component events
+subs.push(ecs.onComponentAdded(Health, (id, data) =&gt; {
+  console.log(`[EVENT] ${id} now has ${data.current}/${data.max} HP`)
+}))
+
+subs.push(ecs.onComponentUpdated(Health, (id, old, current) =&gt; {
+  const delta = current.current - old.current
+  if (delta &lt; 0) {
+    console.log(`[EVENT] ${id} took ${-delta} damage (${current.current} HP remaining)`)
+  }
+}))
+
+// Game logic
+const player = ecs.createEntity(&#39;player&#39;)
+ecs.addComponent(player, Position, { x: 0, y: 0 })
+ecs.addComponent(player, Health, { current: 100, max: 100 })
+
+// Simulate damage
+ecs.updateComponent(player, Health, { current: 75 })
+ecs.updateComponent(player, Health, { current: 50 })
+
+// Cleanup
+ecs.destroyEntity(player)
+subs.forEach(unsub =&gt; unsub())
+</code></pre>
+<p>Output:</p>
+<pre><code>[EVENT] Entity created: player
+[EVENT] player now has 100/100 HP
+[EVENT] player took 25 damage (75 HP remaining)
+[EVENT] player took 25 damage (50 HP remaining)
+[EVENT] Entity destroyed: player
+</code></pre>
+<h2>Variations</h2>
+<h3>Event-Driven UI Updates</h3>
+<pre><code class="language-typescript">// Update health bar when Health changes
+ecs.onComponentUpdated(Health, (entityId, old, current) =&gt; {
+  if (entityId === playerId) {
+    updateHealthBar(current.current, current.max)
+  }
+})
+</code></pre>
+<h3>Spawning Effects on Death</h3>
+<pre><code class="language-typescript">ecs.onEntityDestroyed((entityId) =&gt; {
+  // Check if it was at a position (might have been destroyed for other reasons)
+  const pos = ecs.getComponent(entityId, Position)
+  if (pos) {
+    spawnDeathEffect(pos.x, pos.y)
+  }
+})
+</code></pre>
+<h3>Logging for Debugging</h3>
+<pre><code class="language-typescript">if (DEBUG_MODE) {
+  ecs.onEntityCreated((id) =&gt; console.debug(&#39;Entity+&#39;, id))
+  ecs.onEntityDestroyed((id) =&gt; console.debug(&#39;Entity-&#39;, id))
+  ecs.onComponentAdded(Health, (id) =&gt; console.debug(&#39;Health+&#39;, id))
+  ecs.onComponentRemoved(Health, (id) =&gt; console.debug(&#39;Health-&#39;, id))
+}
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>Events Not Firing</h3>
+<p><strong>Symptom:</strong> Your callback never gets called.</p>
+<p><strong>Cause:</strong> You subscribed after the action already happened, or subscribed to the wrong component.</p>
+<p><strong>Solution:</strong> Subscribe before performing actions. Double-check you&#39;re using the same component definition.</p>
+<h3>Too Many Events</h3>
+<p><strong>Symptom:</strong> Your callback fires too often, causing performance issues.</p>
+<p><strong>Cause:</strong> You&#39;re doing expensive work in the callback.</p>
+<p><strong>Solution:</strong> Queue events and process them in batches, or filter early in the callback.</p>
+<h3>Memory Leaks</h3>
+<p><strong>Symptom:</strong> Memory usage grows over time.</p>
+<p><strong>Cause:</strong> Subscriptions aren&#39;t being cleaned up.</p>
+<p><strong>Solution:</strong> Always store and call unsubscribe functions when done.</p>
+<h2>See Also</h2>
+<ul>
+<li><strong><a href="concept-events.html">Events Concept</a></strong> - Understanding the event system</li>
+<li><strong><a href="api-events.html">Events API</a></strong> - Full method reference</li>
+<li><strong><a href="concept-entities.html">Entities</a></strong> - Entity lifecycle</li>
+<li><strong><a href="concept-components.html">Components</a></strong> - Component lifecycle</li>
+</ul>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

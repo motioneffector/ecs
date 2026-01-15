@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entities - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Entities</h1>
+<p>Entities are unique identifiers in the ECS. They have no data themselves - they&#39;re just IDs that components attach to. Think of an entity as a primary key in a database: it uniquely identifies a &quot;thing&quot; in your game, whether that&#39;s a player, enemy, item, or particle effect.</p>
+<h2>How It Works</h2>
+<p>When you create an entity, you get back a string ID. That ID is then used to attach components, query for the entity, and eventually destroy it.</p>
+<pre><code>Entity: &quot;player-1&quot;
+    │
+    ├── Position { x: 100, y: 200 }
+    ├── Health { current: 80, max: 100 }
+    └── PlayerControlled { active: true }
+
+Entity: &quot;enemy-1&quot;
+    │
+    ├── Position { x: 50, y: 75 }
+    └── Health { current: 30, max: 30 }
+</code></pre>
+<p>The entity itself is just the ID. All the actual data lives in the components attached to it.</p>
+<h2>Basic Usage</h2>
+<pre><code class="language-typescript">// Create with auto-generated ID (UUIDv7)
+const entity = ecs.createEntity()
+// entity = &quot;0190a5b7-1234-7abc-...&quot;
+
+// Create with custom ID
+const player = ecs.createEntity(&#39;player-1&#39;)
+
+// Check if entity exists by trying to add a component
+// (will throw if entity doesn&#39;t exist)
+ecs.addComponent(player, Position, { x: 0, y: 0 })
+
+// Destroy entity (removes all its components too)
+ecs.destroyEntity(player)
+</code></pre>
+<h2>Key Points</h2>
+<ul>
+<li><p><strong>IDs are strings</strong> - Either auto-generated UUIDv7 or custom strings you provide.</p>
+</li>
+<li><p><strong>UUIDv7 is sortable</strong> - Auto-generated IDs are time-sortable, so entities created earlier have lexicographically smaller IDs.</p>
+</li>
+<li><p><strong>Empty entities are valid</strong> - An entity can exist with zero components. It&#39;s just an ID until you add data.</p>
+</li>
+<li><p><strong>Cascade delete</strong> - Destroying an entity automatically removes all its components from their tables.</p>
+</li>
+<li><p><strong>IDs must be unique</strong> - Creating an entity with an ID that already exists throws an error.</p>
+</li>
+</ul>
+<h2>Examples</h2>
+<h3>Auto-generated IDs</h3>
+<pre><code class="language-typescript">const e1 = ecs.createEntity()
+const e2 = ecs.createEntity()
+const e3 = ecs.createEntity()
+
+// IDs are UUIDv7 format, sortable by creation time
+// e1 &lt; e2 &lt; e3 (lexicographically)
+</code></pre>
+<h3>Custom IDs</h3>
+<pre><code class="language-typescript">// Use meaningful IDs for important entities
+const player = ecs.createEntity(&#39;player&#39;)
+const mainCamera = ecs.createEntity(&#39;camera-main&#39;)
+
+// Use prefixed IDs for categories
+const enemy1 = ecs.createEntity(&#39;enemy-001&#39;)
+const enemy2 = ecs.createEntity(&#39;enemy-002&#39;)
+</code></pre>
+<h3>Checking Entity Existence</h3>
+<pre><code class="language-typescript">// Query returns empty array if entity doesn&#39;t exist or lacks components
+const entities = ecs.query([Position])
+
+// hasComponent returns false for non-existent entities
+const hasPos = ecs.hasComponent(&#39;maybe-exists&#39;, Position)  // false if entity doesn&#39;t exist
+</code></pre>
+<h3>Entity Lifecycle</h3>
+<pre><code class="language-typescript">// Create
+const entity = ecs.createEntity()
+
+// Add data
+ecs.addComponent(entity, Position, { x: 0, y: 0 })
+ecs.addComponent(entity, Health, { current: 100, max: 100 })
+
+// Update data
+ecs.updateComponent(entity, Position, { x: 50 })
+
+// Remove specific component
+ecs.removeComponent(entity, Health)
+
+// Destroy entity entirely
+const wasDestroyed = ecs.destroyEntity(entity)  // true
+</code></pre>
+<h2>Related</h2>
+<ul>
+<li><strong><a href="concept-components.html">Components</a></strong> - Data that attaches to entities</li>
+<li><strong><a href="concept-queries.html">Queries</a></strong> - Finding entities by their components</li>
+<li><strong><a href="concept-events.html">Events</a></strong> - React to entity creation and destruction</li>
+<li><strong><a href="api-entities.html">Entity API</a></strong> - createEntity(), destroyEntity() reference</li>
+</ul>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

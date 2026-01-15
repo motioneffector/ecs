@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events API - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Events API</h1>
+<p>Functions for subscribing to entity and component lifecycle events.</p>
+<hr>
+<h2><code>ECS.onEntityCreated()</code></h2>
+<p>Subscribe to entity creation events. Callback fires after each entity is created.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">onEntityCreated(callback: EntityCreatedCallback): UnsubscribeFunction
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>callback</code></td>
+<td><code>EntityCreatedCallback</code></td>
+<td>Yes</td>
+<td>Function called with the new entity ID</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>UnsubscribeFunction</code> — Call to stop receiving events.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const unsubscribe = ecs.onEntityCreated((entityId) =&gt; {
+  console.log(`Entity created: ${entityId}`)
+})
+
+ecs.createEntity()  // Triggers callback
+
+unsubscribe()  // Stop listening
+</code></pre>
+<hr>
+<h2><code>ECS.onEntityDestroyed()</code></h2>
+<p>Subscribe to entity destruction events. Callback fires after each entity is destroyed.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">onEntityDestroyed(callback: EntityDestroyedCallback): UnsubscribeFunction
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>callback</code></td>
+<td><code>EntityDestroyedCallback</code></td>
+<td>Yes</td>
+<td>Function called with the destroyed entity ID</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>UnsubscribeFunction</code> — Call to stop receiving events.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const unsubscribe = ecs.onEntityDestroyed((entityId) =&gt; {
+  console.log(`Entity destroyed: ${entityId}`)
+})
+
+ecs.destroyEntity(entity)  // Triggers callback
+
+unsubscribe()
+</code></pre>
+<hr>
+<h2><code>ECS.onComponentAdded()</code></h2>
+<p>Subscribe to component addition events for a specific component type.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">onComponentAdded&lt;T extends ComponentSchema&gt;(
+  component: ComponentDefinition&lt;T&gt;,
+  callback: ComponentAddedCallback&lt;T&gt;
+): UnsubscribeFunction
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Component type to watch</td>
+</tr>
+<tr>
+<td><code>callback</code></td>
+<td><code>ComponentAddedCallback&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Function called with entity ID and component data</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>UnsubscribeFunction</code> — Call to stop receiving events.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const unsubscribe = ecs.onComponentAdded(Health, (entityId, data) =&gt; {
+  console.log(`${entityId} now has ${data.current}/${data.max} HP`)
+})
+
+ecs.addComponent(entity, Health, { current: 100, max: 100 })
+// Logs: &quot;entity-id now has 100/100 HP&quot;
+
+unsubscribe()
+</code></pre>
+<hr>
+<h2><code>ECS.onComponentRemoved()</code></h2>
+<p>Subscribe to component removal events for a specific component type.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">onComponentRemoved&lt;T extends ComponentSchema&gt;(
+  component: ComponentDefinition&lt;T&gt;,
+  callback: ComponentRemovedCallback
+): UnsubscribeFunction
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Component type to watch</td>
+</tr>
+<tr>
+<td><code>callback</code></td>
+<td><code>ComponentRemovedCallback</code></td>
+<td>Yes</td>
+<td>Function called with entity ID</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>UnsubscribeFunction</code> — Call to stop receiving events.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const unsubscribe = ecs.onComponentRemoved(Health, (entityId) =&gt; {
+  console.log(`${entityId} lost their Health component`)
+})
+
+ecs.removeComponent(entity, Health)
+// Logs: &quot;entity-id lost their Health component&quot;
+
+unsubscribe()
+</code></pre>
+<p>Note: The callback only receives the entity ID, not the removed data (it&#39;s already gone).</p>
+<hr>
+<h2><code>ECS.onComponentUpdated()</code></h2>
+<p>Subscribe to component update events for a specific component type.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">onComponentUpdated&lt;T extends ComponentSchema&gt;(
+  component: ComponentDefinition&lt;T&gt;,
+  callback: ComponentUpdatedCallback&lt;T&gt;
+): UnsubscribeFunction
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Component type to watch</td>
+</tr>
+<tr>
+<td><code>callback</code></td>
+<td><code>ComponentUpdatedCallback&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Function called with entity ID, old data, and new data</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>UnsubscribeFunction</code> — Call to stop receiving events.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const unsubscribe = ecs.onComponentUpdated(Health, (entityId, oldData, newData) =&gt; {
+  const delta = newData.current - oldData.current
+  if (delta &lt; 0) {
+    console.log(`${entityId} took ${-delta} damage`)
+  } else if (delta &gt; 0) {
+    console.log(`${entityId} healed ${delta} HP`)
+  }
+})
+
+ecs.updateComponent(entity, Health, { current: 75 })
+// Logs: &quot;entity-id took 25 damage&quot; (if was at 100)
+
+unsubscribe()
+</code></pre>
+<hr>
+<h2>Types</h2>
+<h3><code>EntityCreatedCallback</code></h3>
+<pre><code class="language-typescript">type EntityCreatedCallback = (entityId: EntityId) =&gt; void
+</code></pre>
+<h3><code>EntityDestroyedCallback</code></h3>
+<pre><code class="language-typescript">type EntityDestroyedCallback = (entityId: EntityId) =&gt; void
+</code></pre>
+<h3><code>ComponentAddedCallback&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">type ComponentAddedCallback&lt;T extends ComponentSchema&gt; = (
+  entityId: EntityId,
+  data: InferComponentData&lt;T&gt;
+) =&gt; void
+</code></pre>
+<h3><code>ComponentRemovedCallback</code></h3>
+<pre><code class="language-typescript">type ComponentRemovedCallback = (entityId: EntityId) =&gt; void
+</code></pre>
+<h3><code>ComponentUpdatedCallback&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">type ComponentUpdatedCallback&lt;T extends ComponentSchema&gt; = (
+  entityId: EntityId,
+  oldData: InferComponentData&lt;T&gt;,
+  newData: InferComponentData&lt;T&gt;
+) =&gt; void
+</code></pre>
+<h3><code>UnsubscribeFunction</code></h3>
+<pre><code class="language-typescript">type UnsubscribeFunction = () =&gt; void
+</code></pre>
+<p>Call this function to stop receiving events. Safe to call multiple times.</p>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
