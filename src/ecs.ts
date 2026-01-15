@@ -128,6 +128,9 @@ export function createECS(
     return value
   }
 
+  // Prototype-related keys that must never be accepted as field names
+  const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
   function validateComponentData<T extends ComponentSchema>(
     component: ComponentDefinition<T>,
     data: Record<string, unknown>,
@@ -147,7 +150,17 @@ export function createECS(
     }
 
     for (const [fieldName, value] of Object.entries(data)) {
-      if (!(fieldName in schema)) {
+      // Security: Reject prototype pollution attempts
+      // Must check before schema lookup to prevent prototype chain access
+      if (FORBIDDEN_KEYS.has(fieldName)) {
+        throw new ValidationError(
+          `Field name "${fieldName}" is forbidden for security reasons`,
+          fieldName
+        )
+      }
+
+      // Security: Use Object.hasOwn to avoid prototype chain lookup
+      if (!Object.hasOwn(schema, fieldName)) {
         throw new ValidationError(
           `Unknown field "${fieldName}" for component "${component.name}"`,
           fieldName
@@ -184,6 +197,12 @@ export function createECS(
           break
         case 'json':
           break
+        default:
+          // Security: Reject unknown field types that might have slipped through
+          throw new ValidationError(
+            `Invalid field type for "${fieldName}" in component "${component.name}"`,
+            fieldName
+          )
       }
     }
   }
