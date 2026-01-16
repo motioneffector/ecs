@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECS Core API - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>ECS Core API</h1>
+<p>Functions for creating and initializing the ECS instance.</p>
+<hr>
+<h2><code>createECS()</code></h2>
+<p>Creates an ECS instance backed by a SQL database. The ECS manages entities and components, providing persistence and querying.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">function createECS(
+  database: Database,
+  components: readonly ComponentDefinition[]
+): ECS
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>database</code></td>
+<td><code>Database</code></td>
+<td>Yes</td>
+<td>Database instance from @motioneffector/sql</td>
+</tr>
+<tr>
+<td><code>components</code></td>
+<td><code>ComponentDefinition[]</code></td>
+<td>Yes</td>
+<td>Array of component definitions to register</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>ECS</code> — The ECS instance with all management methods.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+const Health = defineComponent(&#39;Health&#39;, { current: &#39;number&#39;, max: &#39;number&#39; })
+
+const db = await createDatabase()
+const ecs = createECS(db, [Position, Health])
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Database is null or undefined</li>
+<li><code>ValidationError</code> — Components array contains duplicate names</li>
+</ul>
+<hr>
+<h2><code>ECS.initialize()</code></h2>
+<p>Creates database tables for entities and all registered components. Call this once before using the ECS.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">initialize(): Promise&lt;void&gt;
+</code></pre>
+<p><strong>Parameters:</strong> None</p>
+<p><strong>Returns:</strong> <code>Promise&lt;void&gt;</code> — Resolves when initialization is complete.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const ecs = createECS(db, [Position, Health])
+await ecs.initialize()
+
+// Now ready to create entities and add components
+const entity = ecs.createEntity()
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>DatabaseError</code> — Table creation fails</li>
+</ul>
+<hr>
+<h2><code>ECS.getDatabase()</code></h2>
+<p>Returns the underlying database instance. Useful for advanced operations or debugging.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">getDatabase(): Database
+</code></pre>
+<p><strong>Parameters:</strong> None</p>
+<p><strong>Returns:</strong> <code>Database</code> — The database instance passed to createECS().</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const db = ecs.getDatabase()
+
+// Use for advanced SQL operations
+const tables = db.getTables()
+console.log(tables)
+</code></pre>
+<hr>
+<h2>Types</h2>
+<h3><code>ECS</code></h3>
+<p>The main ECS interface with all entity and component management methods.</p>
+<pre><code class="language-typescript">interface ECS {
+  // Initialization
+  initialize(): Promise&lt;void&gt;
+
+  // Entity operations
+  createEntity(customId?: EntityId): EntityId
+  destroyEntity(entityId: EntityId): boolean
+
+  // Component operations
+  addComponent&lt;T extends ComponentSchema&gt;(entityId: EntityId, component: ComponentDefinition&lt;T&gt;, data: InferComponentData&lt;T&gt;): EntityId
+  getComponent&lt;T extends ComponentSchema&gt;(entityId: EntityId, component: ComponentDefinition&lt;T&gt;): InferComponentData&lt;T&gt; | null
+  updateComponent&lt;T extends ComponentSchema&gt;(entityId: EntityId, component: ComponentDefinition&lt;T&gt;, data: Partial&lt;InferComponentData&lt;T&gt;&gt;): EntityId
+  removeComponent&lt;T extends ComponentSchema&gt;(entityId: EntityId, component: ComponentDefinition&lt;T&gt;): EntityId
+  hasComponent&lt;T extends ComponentSchema&gt;(entityId: EntityId, component: ComponentDefinition&lt;T&gt;): boolean
+
+  // Query operations
+  query&lt;T extends ComponentSchema&gt;(components: ComponentDefinition&lt;T&gt;[], options?: QueryOptions&lt;T&gt;): EntityId[]
+  queryWithData&lt;T extends ComponentDefinition[]&gt;(components: T, options?: QueryOptions&lt;T[number][&#39;schema&#39;]&gt;): QueryResult&lt;T&gt;[]
+  rawQuery&lt;T = unknown&gt;(sql: string, params?: unknown[]): T[]
+
+  // Bulk operations
+  addComponentBulk&lt;T extends ComponentSchema&gt;(entityIds: EntityId[], component: ComponentDefinition&lt;T&gt;, data: InferComponentData&lt;T&gt;): void
+  removeComponentBulk&lt;T extends ComponentSchema&gt;(entityIds: EntityId[], component: ComponentDefinition&lt;T&gt;): void
+
+  // Transaction support
+  transaction&lt;T&gt;(callback: TransactionCallback&lt;T&gt;): Promise&lt;T&gt;
+
+  // Event subscriptions
+  onEntityCreated(callback: EntityCreatedCallback): UnsubscribeFunction
+  onEntityDestroyed(callback: EntityDestroyedCallback): UnsubscribeFunction
+  onComponentAdded&lt;T extends ComponentSchema&gt;(component: ComponentDefinition&lt;T&gt;, callback: ComponentAddedCallback&lt;T&gt;): UnsubscribeFunction
+  onComponentRemoved&lt;T extends ComponentSchema&gt;(component: ComponentDefinition&lt;T&gt;, callback: ComponentRemovedCallback): UnsubscribeFunction
+  onComponentUpdated&lt;T extends ComponentSchema&gt;(component: ComponentDefinition&lt;T&gt;, callback: ComponentUpdatedCallback&lt;T&gt;): UnsubscribeFunction
+
+  // Archetype support
+  defineArchetype(components: readonly ComponentDefinition[]): ArchetypeDefinition
+  createFromArchetype&lt;T extends readonly ComponentDefinition[]&gt;(archetype: ArchetypeDefinition, data: ArchetypeData&lt;T&gt;): EntityId
+
+  // Index management
+  addIndex&lt;T extends ComponentSchema&gt;(component: ComponentDefinition&lt;T&gt;, field: keyof InferComponentData&lt;T&gt;): void
+
+  // Database access
+  getDatabase(): Database
+}
+</code></pre>
+<h3><code>EntityId</code></h3>
+<pre><code class="language-typescript">type EntityId = string
+</code></pre>
+<p>Entity identifiers are strings - either auto-generated UUIDv7 or custom IDs you provide.</p>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

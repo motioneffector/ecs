@@ -14,7 +14,7 @@
       <nav class="header-links">
         <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">📦 npm</a>
         <a href="https://github.com/motioneffector/ecs" class="header-link">💻 GitHub</a>
-        <a href="../../wiki" class="header-link">📖 Wiki</a>
+        <a href="manual/index.html" class="header-link">📖 Manual</a>
       </nav>
     </header>
 
@@ -105,15 +105,9 @@
     </main>
   </div>
 
-  <!-- Library (from dist) -->
-  <script type="module">
-    import * as Library from './dist/index.js'
-    window.Library = Library
-  </script>
-
-  <!-- Demo scripts (order matters) -->
+  <!-- Demo scripts (order matters: test-runner first, then demo loads library, then tests) -->
   <script src="demo-files/test-runner.js"></script>
-  <script src="demo-files/demo.js"></script>
-  <script src="demo-files/tests.js"></script>
+  <script type="module" src="demo-files/demo.js"></script>
+  <script type="module" src="demo-files/tests.js"></script>
 </body>
 </html>

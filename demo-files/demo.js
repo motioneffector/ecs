@@ -2,15 +2,12 @@
 // DEMO LOGIC AND EXHIBIT CODE
 // ============================================
 
-// Verify library is loaded
-if (typeof window.Library === 'undefined') {
-  throw new Error(
-    'Library not loaded. Run `pnpm build` first, then serve this directory.'
-  )
-}
+// Import library and expose globally for tests
+import * as Library from '../dist/index.js'
+window.Library = Library
 
 // Extract library exports
-const { defineComponent, createECS, ECSError, ValidationError, DatabaseError } = window.Library
+const { defineComponent, createECS, ECSError, ValidationError, DatabaseError } = Library
 
 // ============================================
 // MOCK DATABASE FOR BROWSER
@@ -207,6 +204,9 @@ class MockDatabase {
     }
   }
 }
+
+// Make MockDatabase available globally for tests
+window.MockDatabase = MockDatabase
 
 // ============================================
 // COMPONENT DEFINITIONS

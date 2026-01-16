@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Using Archetypes - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Using Archetypes</h1>
+<p>This guide shows you how to use archetypes to create entities from predefined templates, ensuring consistent component sets for common entity types.</p>
+<h2>Prerequisites</h2>
+<p>Before starting, you should:</p>
+<ul>
+<li><a href="your-first-ecs.html">Complete Your First ECS</a></li>
+<li><a href="concept-components.html">Understand components</a></li>
+</ul>
+<h2>Overview</h2>
+<p>We&#39;ll cover:</p>
+<ol>
+<li>Defining an archetype</li>
+<li>Creating entities from archetypes</li>
+<li>Common archetype patterns</li>
+</ol>
+<h2>Step 1: Define an Archetype</h2>
+<p>An archetype is a predefined combination of components. Define it once, then use it to create entities that always have those components.</p>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+const Health = defineComponent(&#39;Health&#39;, { current: &#39;number&#39;, max: &#39;number&#39; })
+const Velocity = defineComponent(&#39;Velocity&#39;, { vx: &#39;number&#39;, vy: &#39;number&#39; })
+
+const db = await createDatabase()
+const ecs = createECS(db, [Position, Health, Velocity])
+await ecs.initialize()
+
+// Define an archetype for moving characters
+const CharacterArchetype = ecs.defineArchetype([Position, Health, Velocity])
+</code></pre>
+<p>The archetype ensures all its components are registered with the ECS.</p>
+<h2>Step 2: Create Entities from Archetypes</h2>
+<p>Use <code>createFromArchetype</code> to create an entity with all archetype components in one call:</p>
+<pre><code class="language-typescript">// Create a player using the archetype
+const player = ecs.createFromArchetype(CharacterArchetype, {
+  Position: { x: 0, y: 0 },
+  Health: { current: 100, max: 100 },
+  Velocity: { vx: 0, vy: 0 }
+})
+
+// The entity now has all three components
+console.log(ecs.hasComponent(player, Position))  // true
+console.log(ecs.hasComponent(player, Health))    // true
+console.log(ecs.hasComponent(player, Velocity))  // true
+</code></pre>
+<p>You must provide data for every component in the archetype.</p>
+<h2>Step 3: Common Archetype Patterns</h2>
+<h3>Player Archetype</h3>
+<pre><code class="language-typescript">const PlayerControlled = defineComponent(&#39;PlayerControlled&#39;, {
+  inputEnabled: &#39;boolean&#39;
+})
+
+const PlayerArchetype = ecs.defineArchetype([
+  Position,
+  Health,
+  Velocity,
+  PlayerControlled
+])
+
+const player = ecs.createFromArchetype(PlayerArchetype, {
+  Position: { x: 100, y: 100 },
+  Health: { current: 100, max: 100 },
+  Velocity: { vx: 0, vy: 0 },
+  PlayerControlled: { inputEnabled: true }
+})
+</code></pre>
+<h3>Enemy Archetype</h3>
+<pre><code class="language-typescript">const AIControlled = defineComponent(&#39;AIControlled&#39;, {
+  behavior: &#39;string&#39;,
+  aggroRange: &#39;number&#39;
+})
+
+const EnemyArchetype = ecs.defineArchetype([
+  Position,
+  Health,
+  Velocity,
+  AIControlled
+])
+
+function spawnEnemy(x: number, y: number, behavior: string) {
+  return ecs.createFromArchetype(EnemyArchetype, {
+    Position: { x, y },
+    Health: { current: 30, max: 30 },
+    Velocity: { vx: 0, vy: 0 },
+    AIControlled: { behavior, aggroRange: 100 }
+  })
+}
+
+const goblin = spawnEnemy(200, 150, &#39;patrol&#39;)
+const boss = spawnEnemy(500, 500, &#39;guard&#39;)
+</code></pre>
+<h3>Item Archetype</h3>
+<pre><code class="language-typescript">const Pickupable = defineComponent(&#39;Pickupable&#39;, {
+  itemId: &#39;string&#39;,
+  quantity: &#39;number&#39;
+})
+
+const Sprite = defineComponent(&#39;Sprite&#39;, {
+  texture: &#39;string&#39;,
+  width: &#39;number&#39;,
+  height: &#39;number&#39;
+})
+
+const ItemArchetype = ecs.defineArchetype([
+  Position,
+  Sprite,
+  Pickupable
+])
+
+function spawnItem(x: number, y: number, itemId: string, quantity: number) {
+  return ecs.createFromArchetype(ItemArchetype, {
+    Position: { x, y },
+    Sprite: { texture: `items/${itemId}.png`, width: 32, height: 32 },
+    Pickupable: { itemId, quantity }
+  })
+}
+
+const healthPotion = spawnItem(100, 100, &#39;health-potion&#39;, 1)
+const goldPile = spawnItem(150, 100, &#39;gold&#39;, 50)
+</code></pre>
+<h2>Complete Example</h2>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+// Define components
+const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+const Health = defineComponent(&#39;Health&#39;, { current: &#39;number&#39;, max: &#39;number&#39; })
+const Velocity = defineComponent(&#39;Velocity&#39;, { vx: &#39;number&#39;, vy: &#39;number&#39; })
+const Team = defineComponent(&#39;Team&#39;, { name: &#39;string&#39; })
+const Damage = defineComponent(&#39;Damage&#39;, { amount: &#39;number&#39; })
+
+// Initialize ECS
+const db = await createDatabase()
+const ecs = createECS(db, [Position, Health, Velocity, Team, Damage])
+await ecs.initialize()
+
+// Define archetypes
+const PlayerArchetype = ecs.defineArchetype([Position, Health, Velocity, Team])
+const EnemyArchetype = ecs.defineArchetype([Position, Health, Velocity, Team, Damage])
+const ProjectileArchetype = ecs.defineArchetype([Position, Velocity, Damage, Team])
+
+// Create entities from archetypes
+const player = ecs.createFromArchetype(PlayerArchetype, {
+  Position: { x: 100, y: 100 },
+  Health: { current: 100, max: 100 },
+  Velocity: { vx: 0, vy: 0 },
+  Team: { name: &#39;player&#39; }
+})
+
+const enemy = ecs.createFromArchetype(EnemyArchetype, {
+  Position: { x: 300, y: 100 },
+  Health: { current: 50, max: 50 },
+  Velocity: { vx: -1, vy: 0 },
+  Team: { name: &#39;enemy&#39; },
+  Damage: { amount: 10 }
+})
+
+const fireball = ecs.createFromArchetype(ProjectileArchetype, {
+  Position: { x: 100, y: 100 },
+  Velocity: { vx: 5, vy: 0 },
+  Damage: { amount: 25 },
+  Team: { name: &#39;player&#39; }
+})
+
+// Query by components (archetypes don&#39;t affect queries)
+const movingEntities = ecs.query([Position, Velocity])
+console.log(movingEntities.length)  // 3
+
+const damageDealing = ecs.query([Damage])
+console.log(damageDealing.length)  // 2 (enemy and fireball)
+</code></pre>
+<h2>Variations</h2>
+<h3>Factory Functions with Archetypes</h3>
+<pre><code class="language-typescript">const EnemyArchetype = ecs.defineArchetype([Position, Health, Velocity])
+
+// Wrap archetype usage in a factory for convenience
+function createEnemy(config: {
+  x: number
+  y: number
+  hp: number
+  speed: number
+}) {
+  return ecs.createFromArchetype(EnemyArchetype, {
+    Position: { x: config.x, y: config.y },
+    Health: { current: config.hp, max: config.hp },
+    Velocity: { vx: -config.speed, vy: 0 }
+  })
+}
+
+// Clean API for game code
+const enemy1 = createEnemy({ x: 100, y: 50, hp: 30, speed: 1 })
+const enemy2 = createEnemy({ x: 200, y: 50, hp: 50, speed: 0.5 })
+</code></pre>
+<h3>Multiple Archetypes per Entity Type</h3>
+<pre><code class="language-typescript">// Base archetype
+const BaseCharacter = ecs.defineArchetype([Position, Health])
+
+// Extended archetypes for variants
+const MeleeEnemy = ecs.defineArchetype([Position, Health, MeleeDamage])
+const RangedEnemy = ecs.defineArchetype([Position, Health, RangedAttack])
+const FlyingEnemy = ecs.defineArchetype([Position, Health, Flying])
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>Missing Component Data</h3>
+<p><strong>Symptom:</strong> Error about missing data for component.</p>
+<p><strong>Cause:</strong> You didn&#39;t provide data for all components in the archetype.</p>
+<p><strong>Solution:</strong> Ensure the data object has a key for every component in the archetype.</p>
+<h3>Component Not Registered</h3>
+<p><strong>Symptom:</strong> Error about component not registered with ECS.</p>
+<p><strong>Cause:</strong> The component used in the archetype wasn&#39;t passed to createECS().</p>
+<p><strong>Solution:</strong> Include all components in the array passed to createECS().</p>
+<h2>See Also</h2>
+<ul>
+<li><strong><a href="concept-components.html">Components Concept</a></strong> - Understanding components</li>
+<li><strong><a href="api-advanced.html">Advanced API</a></strong> - defineArchetype(), createFromArchetype() reference</li>
+<li><strong><a href="your-first-ecs.html">Your First ECS</a></strong> - Basic entity creation</li>
+</ul>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

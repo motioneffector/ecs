@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Definition API - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Component Definition API</h1>
+<p>Functions for defining component schemas.</p>
+<hr>
+<h2><code>defineComponent()</code></h2>
+<p>Creates a component definition with a name and schema. Component definitions are immutable blueprints used to add typed data to entities.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">function defineComponent&lt;T extends ComponentSchema&gt;(
+  name: string,
+  schema: T
+): ComponentDefinition&lt;T&gt;
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Unique name for the component. Used as the database table suffix.</td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td><code>T</code></td>
+<td>Yes</td>
+<td>Object mapping field names to field types.</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>ComponentDefinition&lt;T&gt;</code> — A frozen component definition object.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">import { defineComponent } from &#39;@motioneffector/ecs&#39;
+
+const Position = defineComponent(&#39;Position&#39;, {
+  x: &#39;number&#39;,
+  y: &#39;number&#39;
+})
+
+const Health = defineComponent(&#39;Health&#39;, {
+  current: &#39;number&#39;,
+  max: &#39;number&#39;
+})
+
+const Inventory = defineComponent(&#39;Inventory&#39;, {
+  capacity: &#39;number&#39;,
+  items: &#39;json&#39;
+})
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Name is empty or whitespace-only</li>
+<li><code>ValidationError</code> — Schema is empty (no fields)</li>
+<li><code>ValidationError</code> — Schema contains invalid field type</li>
+<li><code>ValidationError</code> — Schema contains reserved field name <code>entity_id</code></li>
+</ul>
+<hr>
+<h2>Types</h2>
+<h3><code>FieldType</code></h3>
+<pre><code class="language-typescript">type FieldType = &#39;string&#39; | &#39;number&#39; | &#39;boolean&#39; | &#39;json&#39;
+</code></pre>
+<p>The supported field types for component schemas:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>TypeScript Type</th>
+<th>SQL Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;string&#39;</code></td>
+<td><code>string</code></td>
+<td><code>TEXT</code></td>
+<td>Any string value</td>
+</tr>
+<tr>
+<td><code>&#39;number&#39;</code></td>
+<td><code>number</code></td>
+<td><code>REAL</code></td>
+<td>Any numeric value</td>
+</tr>
+<tr>
+<td><code>&#39;boolean&#39;</code></td>
+<td><code>boolean</code></td>
+<td><code>INTEGER</code></td>
+<td>Stored as 0 or 1</td>
+</tr>
+<tr>
+<td><code>&#39;json&#39;</code></td>
+<td><code>unknown</code></td>
+<td><code>TEXT</code></td>
+<td>JSON-serialized, can be arrays or objects</td>
+</tr>
+</tbody></table>
+<h3><code>ComponentSchema</code></h3>
+<pre><code class="language-typescript">type ComponentSchema = Record&lt;string, FieldType&gt;
+</code></pre>
+<p>An object mapping field names to their types.</p>
+<h3><code>ComponentDefinition&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">interface ComponentDefinition&lt;T extends ComponentSchema = ComponentSchema&gt; {
+  readonly name: string
+  readonly schema: T
+}
+</code></pre>
+<p>The frozen definition object returned by <code>defineComponent()</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>The component name</td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td><code>T</code></td>
+<td>The field schema</td>
+</tr>
+</tbody></table>
+<h3><code>InferComponentData&lt;T&gt;</code></h3>
+<pre><code class="language-typescript">type InferComponentData&lt;T extends ComponentSchema&gt; = {
+  [K in keyof T]: T[K] extends &#39;string&#39;
+    ? string
+    : T[K] extends &#39;number&#39;
+      ? number
+      : T[K] extends &#39;boolean&#39;
+        ? boolean
+        : T[K] extends &#39;json&#39;
+          ? unknown
+          : never
+}
+</code></pre>
+<p>Infers the TypeScript data type from a component schema. Used for type-safe component operations.</p>
+<pre><code class="language-typescript">const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+
+// InferComponentData&lt;typeof Position.schema&gt; = { x: number, y: number }
+</code></pre>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

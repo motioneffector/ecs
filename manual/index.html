@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>@motioneffector/ecs - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>@motioneffector/ecs</h1>
+<p>An Entity Component System that stores your game state in SQL tables. Instead of managing objects in memory, you define component schemas and the ECS handles persistence, querying, and transactions automatically. Think of entities as database rows and components as the tables they belong to.</p>
+<h2>I want to...</h2>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Where to go</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Get up and running quickly</td>
+<td><a href="your-first-ecs.html">Your First ECS</a></td>
+</tr>
+<tr>
+<td>Understand what components are</td>
+<td><a href="concept-components.html">Components</a></td>
+</tr>
+<tr>
+<td>Understand how queries work</td>
+<td><a href="concept-queries.html">Queries</a></td>
+</tr>
+<tr>
+<td>Handle entity lifecycle events</td>
+<td><a href="guide-working-with-events.html">Working with Events</a></td>
+</tr>
+<tr>
+<td>Use transactions for complex operations</td>
+<td><a href="guide-using-transactions.html">Using Transactions</a></td>
+</tr>
+<tr>
+<td>Look up a specific method</td>
+<td><a href="api-ecs-core.html">API Reference</a></td>
+</tr>
+</tbody></table>
+<h2>Key Concepts</h2>
+<h3>Components</h3>
+<p>Components are typed data schemas. You define a component once (like &quot;Position&quot; with x and y fields), then attach instances of it to any entity. Each entity can have zero or one of each component type.</p>
+<h3>Entities</h3>
+<p>Entities are unique identifiers with no data of their own. They&#39;re just IDs that components attach to. Create an entity, add components to give it properties, query to find entities with specific components.</p>
+<h3>Queries</h3>
+<p>Queries find entities based on which components they have. Ask for &quot;all entities with Position and Health&quot; and get back the matching entity IDs. Add filters to narrow by component data values.</p>
+<h2>Quick Example</h2>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+// Define your component schemas
+const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+const Health = defineComponent(&#39;Health&#39;, { current: &#39;number&#39;, max: &#39;number&#39; })
+
+// Create the ECS backed by a database
+const db = await createDatabase()
+const ecs = createECS(db, [Position, Health])
+await ecs.initialize()
+
+// Create an entity and add components
+const player = ecs.createEntity()
+ecs.addComponent(player, Position, { x: 100, y: 200 })
+ecs.addComponent(player, Health, { current: 80, max: 100 })
+
+// Query entities that have both components
+const entities = ecs.query([Position, Health])
+// entities = [player]
+
+// Get component data
+const pos = ecs.getComponent(player, Position)
+// pos = { x: 100, y: 200 }
+</code></pre>
+<hr>
+<p><strong><a href="api-ecs-core.html">Full API Reference →</a></strong></p>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

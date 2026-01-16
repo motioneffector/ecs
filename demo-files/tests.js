@@ -1,3 +1,7 @@
+// Import library to ensure it is available (also set by demo.js)
+import * as Library from '../dist/index.js'
+if (!window.Library) window.Library = Library
+
 // ============================================
 // DEMO INTEGRITY TESTS
 // These tests verify the demo itself is correctly structured.
@@ -308,11 +312,11 @@ testRunner.registerTest('defineComponent: rejects invalid field type', async () 
 
 // Helper to create a MockDatabase - note: MockDatabase is defined in demo.js
 function createMockDB() {
-  // Access MockDatabase from the global scope where demo.js defines it
-  if (typeof MockDatabase === 'undefined') {
+  // Access MockDatabase from window where demo.js exposes it
+  if (typeof window.MockDatabase === 'undefined') {
     throw new Error('MockDatabase not available - demo.js must be loaded first')
   }
-  return new MockDatabase()
+  return new window.MockDatabase()
 }
 
 // ECS initialization tests

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Operations API - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Component Operations API</h1>
+<p>Functions for adding, reading, updating, and removing component data on entities.</p>
+<hr>
+<h2><code>ECS.addComponent()</code></h2>
+<p>Adds a component with data to an entity. Each entity can have at most one instance of each component type.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">addComponent&lt;T extends ComponentSchema&gt;(
+  entityId: EntityId,
+  component: ComponentDefinition&lt;T&gt;,
+  data: InferComponentData&lt;T&gt;
+): EntityId
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityId</code></td>
+<td><code>EntityId</code></td>
+<td>Yes</td>
+<td>The entity to add the component to</td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component definition</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>InferComponentData&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component data (must match schema)</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>EntityId</code> — The entity ID (for chaining).</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const entity = ecs.createEntity()
+
+ecs.addComponent(entity, Position, { x: 100, y: 200 })
+ecs.addComponent(entity, Health, { current: 80, max: 100 })
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Entity does not exist</li>
+<li><code>ValidationError</code> — Component not registered with ECS</li>
+<li><code>ValidationError</code> — Entity already has this component</li>
+<li><code>ValidationError</code> — Data missing required fields</li>
+<li><code>ValidationError</code> — Data contains unknown fields</li>
+<li><code>ValidationError</code> — Data field has wrong type</li>
+</ul>
+<hr>
+<h2><code>ECS.getComponent()</code></h2>
+<p>Gets the component data for an entity, or null if the entity doesn&#39;t have the component.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">getComponent&lt;T extends ComponentSchema&gt;(
+  entityId: EntityId,
+  component: ComponentDefinition&lt;T&gt;
+): InferComponentData&lt;T&gt; | null
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityId</code></td>
+<td><code>EntityId</code></td>
+<td>Yes</td>
+<td>The entity to get data from</td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component definition</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>InferComponentData&lt;T&gt; | null</code> — The component data, or null if not present.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const pos = ecs.getComponent(entity, Position)
+if (pos) {
+  console.log(`Position: (${pos.x}, ${pos.y})`)
+}
+
+// Returns null for missing component
+const health = ecs.getComponent(entity, Health)
+// health = null (if not added)
+
+// Returns null for non-existent entity
+const data = ecs.getComponent(&#39;invalid-id&#39;, Position)
+// data = null
+</code></pre>
+<hr>
+<h2><code>ECS.updateComponent()</code></h2>
+<p>Updates specific fields of a component. Only the fields provided are updated; others remain unchanged.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">updateComponent&lt;T extends ComponentSchema&gt;(
+  entityId: EntityId,
+  component: ComponentDefinition&lt;T&gt;,
+  data: Partial&lt;InferComponentData&lt;T&gt;&gt;
+): EntityId
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityId</code></td>
+<td><code>EntityId</code></td>
+<td>Yes</td>
+<td>The entity to update</td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component definition</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>Partial&lt;InferComponentData&lt;T&gt;&gt;</code></td>
+<td>Yes</td>
+<td>Fields to update</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>EntityId</code> — The entity ID (for chaining).</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">// Update only x, leave y unchanged
+ecs.updateComponent(entity, Position, { x: 150 })
+
+// Update multiple fields
+ecs.updateComponent(entity, Health, { current: 50, max: 120 })
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Entity does not exist</li>
+<li><code>ValidationError</code> — Entity does not have this component</li>
+<li><code>ValidationError</code> — Data contains unknown fields</li>
+<li><code>ValidationError</code> — Data field has wrong type</li>
+</ul>
+<hr>
+<h2><code>ECS.removeComponent()</code></h2>
+<p>Removes a component from an entity. No-op if the entity doesn&#39;t have the component.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">removeComponent&lt;T extends ComponentSchema&gt;(
+  entityId: EntityId,
+  component: ComponentDefinition&lt;T&gt;
+): EntityId
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityId</code></td>
+<td><code>EntityId</code></td>
+<td>Yes</td>
+<td>The entity to remove from</td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component definition</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>EntityId</code> — The entity ID (for chaining).</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">ecs.removeComponent(entity, Health)
+
+// Component is now gone
+const health = ecs.getComponent(entity, Health)
+// health = null
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Entity does not exist</li>
+</ul>
+<hr>
+<h2><code>ECS.hasComponent()</code></h2>
+<p>Checks if an entity has a specific component.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">hasComponent&lt;T extends ComponentSchema&gt;(
+  entityId: EntityId,
+  component: ComponentDefinition&lt;T&gt;
+): boolean
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityId</code></td>
+<td><code>EntityId</code></td>
+<td>Yes</td>
+<td>The entity to check</td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component definition</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>boolean</code> — <code>true</code> if entity has the component, <code>false</code> otherwise.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">if (ecs.hasComponent(entity, Health)) {
+  const health = ecs.getComponent(entity, Health)!
+  console.log(`HP: ${health.current}/${health.max}`)
+}
+
+// Returns false for non-existent entities
+const has = ecs.hasComponent(&#39;invalid-id&#39;, Health)
+// has = false
+</code></pre>
+<hr>
+<h2><code>ECS.addComponentBulk()</code></h2>
+<p>Adds the same component data to multiple entities in a single transaction.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">addComponentBulk&lt;T extends ComponentSchema&gt;(
+  entityIds: EntityId[],
+  component: ComponentDefinition&lt;T&gt;,
+  data: InferComponentData&lt;T&gt;
+): void
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityIds</code></td>
+<td><code>EntityId[]</code></td>
+<td>Yes</td>
+<td>Array of entity IDs</td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component definition</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>InferComponentData&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>Data to add to all entities</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>void</code></p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const enemies = [enemy1, enemy2, enemy3, enemy4]
+
+// Add same health to all enemies
+ecs.addComponentBulk(enemies, Health, { current: 50, max: 50 })
+</code></pre>
+<hr>
+<h2><code>ECS.removeComponentBulk()</code></h2>
+<p>Removes a component from multiple entities in a single transaction.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">removeComponentBulk&lt;T extends ComponentSchema&gt;(
+  entityIds: EntityId[],
+  component: ComponentDefinition&lt;T&gt;
+): void
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityIds</code></td>
+<td><code>EntityId[]</code></td>
+<td>Yes</td>
+<td>Array of entity IDs</td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td><code>ComponentDefinition&lt;T&gt;</code></td>
+<td>Yes</td>
+<td>The component definition</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>void</code></p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const deadEnemies = [enemy1, enemy3]
+
+// Remove health from dead enemies
+ecs.removeComponentBulk(deadEnemies, Health)
+</code></pre>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

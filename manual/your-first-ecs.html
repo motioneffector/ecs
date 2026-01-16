@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your First ECS - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Your First ECS</h1>
+<p>This guide walks you through creating a working Entity Component System in about 5 minutes.</p>
+<p>By the end, you&#39;ll have an ECS with Position and Health components, a player entity, and a query that finds it.</p>
+<h2>What We&#39;re Building</h2>
+<p>A simple game state system where:</p>
+<ul>
+<li>Entities can have Position (x, y coordinates) and Health (current/max HP)</li>
+<li>We can create a player entity with both components</li>
+<li>We can query to find all entities that have both components</li>
+</ul>
+<h2>Step 1: Define Component Schemas</h2>
+<p>Components are data templates. Define them once, then attach instances to entities.</p>
+<pre><code class="language-typescript">import { defineComponent } from &#39;@motioneffector/ecs&#39;
+
+const Position = defineComponent(&#39;Position&#39;, {
+  x: &#39;number&#39;,
+  y: &#39;number&#39;
+})
+
+const Health = defineComponent(&#39;Health&#39;, {
+  current: &#39;number&#39;,
+  max: &#39;number&#39;
+})
+</code></pre>
+<p>Each field has a type: <code>&#39;string&#39;</code>, <code>&#39;number&#39;</code>, <code>&#39;boolean&#39;</code>, or <code>&#39;json&#39;</code> for complex data.</p>
+<h2>Step 2: Create the Database and ECS</h2>
+<p>The ECS needs a database to store entity and component data. Pass your component definitions when creating the ECS.</p>
+<pre><code class="language-typescript">import { createDatabase } from &#39;@motioneffector/sql&#39;
+import { createECS } from &#39;@motioneffector/ecs&#39;
+
+const db = await createDatabase()  // In-memory database
+const ecs = createECS(db, [Position, Health])
+</code></pre>
+<h2>Step 3: Initialize</h2>
+<p>Initialize creates the database tables for your components. Call this once before using the ECS.</p>
+<pre><code class="language-typescript">await ecs.initialize()
+</code></pre>
+<h2>Step 4: Create an Entity</h2>
+<p>Entities are just unique IDs. Create one, then add components to give it data.</p>
+<pre><code class="language-typescript">const player = ecs.createEntity()
+// player = &quot;0190a5b7-...&quot;  (auto-generated UUID)
+</code></pre>
+<p>You can also provide a custom ID:</p>
+<pre><code class="language-typescript">const player = ecs.createEntity(&#39;player-1&#39;)
+</code></pre>
+<h2>Step 5: Add Components</h2>
+<p>Attach component data to your entity. The data must match the schema you defined.</p>
+<pre><code class="language-typescript">ecs.addComponent(player, Position, { x: 100, y: 200 })
+ecs.addComponent(player, Health, { current: 80, max: 100 })
+</code></pre>
+<h2>Step 6: Query Entities</h2>
+<p>Find entities that have specific components. This returns an array of entity IDs.</p>
+<pre><code class="language-typescript">const entities = ecs.query([Position, Health])
+// entities = [&#39;player-1&#39;]
+
+// Get component data for an entity
+const pos = ecs.getComponent(player, Position)
+// pos = { x: 100, y: 200 }
+
+const hp = ecs.getComponent(player, Health)
+// hp = { current: 80, max: 100 }
+</code></pre>
+<h2>The Complete Code</h2>
+<p>Here&#39;s everything together:</p>
+<pre><code class="language-typescript">import { createDatabase } from &#39;@motioneffector/sql&#39;
+import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+
+// 1. Define components
+const Position = defineComponent(&#39;Position&#39;, {
+  x: &#39;number&#39;,
+  y: &#39;number&#39;
+})
+
+const Health = defineComponent(&#39;Health&#39;, {
+  current: &#39;number&#39;,
+  max: &#39;number&#39;
+})
+
+// 2. Create database and ECS
+const db = await createDatabase()
+const ecs = createECS(db, [Position, Health])
+
+// 3. Initialize (creates tables)
+await ecs.initialize()
+
+// 4. Create an entity
+const player = ecs.createEntity(&#39;player-1&#39;)
+
+// 5. Add components
+ecs.addComponent(player, Position, { x: 100, y: 200 })
+ecs.addComponent(player, Health, { current: 80, max: 100 })
+
+// 6. Query
+const entities = ecs.query([Position, Health])
+console.log(entities)  // [&#39;player-1&#39;]
+
+const pos = ecs.getComponent(player, Position)
+console.log(pos)  // { x: 100, y: 200 }
+</code></pre>
+<h2>What&#39;s Next?</h2>
+<p>Now that you have the basics:</p>
+<ul>
+<li><strong><a href="concept-components.html">Understand Components better</a></strong> - Learn about field types and validation</li>
+<li><strong><a href="concept-queries.html">Learn about Queries</a></strong> - Filter entities by component data</li>
+<li><strong><a href="guide-working-with-events.html">Handle events</a></strong> - React when entities or components change</li>
+<li><strong><a href="api-ecs-core.html">Explore the API</a></strong> - Full reference when you need details</li>
+</ul>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

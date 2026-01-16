@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entities API - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Entities API</h1>
+<p>Functions for creating and destroying entities.</p>
+<hr>
+<h2><code>ECS.createEntity()</code></h2>
+<p>Creates a new entity with an auto-generated or custom ID.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">createEntity(customId?: EntityId): EntityId
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>customId</code></td>
+<td><code>EntityId</code></td>
+<td>No</td>
+<td>Custom string ID. If omitted, generates UUIDv7.</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>EntityId</code> — The ID of the created entity.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">// Auto-generated ID (UUIDv7)
+const entity1 = ecs.createEntity()
+// entity1 = &quot;0190a5b7-1234-7abc-8def-...&quot;
+
+// Custom ID
+const player = ecs.createEntity(&#39;player-1&#39;)
+// player = &quot;player-1&quot;
+</code></pre>
+<p><strong>Throws:</strong></p>
+<ul>
+<li><code>ValidationError</code> — Custom ID is empty or whitespace-only</li>
+<li><code>ValidationError</code> — Entity with custom ID already exists</li>
+</ul>
+<hr>
+<h2><code>ECS.destroyEntity()</code></h2>
+<p>Destroys an entity and all its components. Components are removed via CASCADE delete.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-typescript">destroyEntity(entityId: EntityId): boolean
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>entityId</code></td>
+<td><code>EntityId</code></td>
+<td>Yes</td>
+<td>The ID of the entity to destroy</td>
+</tr>
+</tbody></table>
+<p><strong>Returns:</strong> <code>boolean</code> — <code>true</code> if the entity existed and was destroyed, <code>false</code> if it didn&#39;t exist.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-typescript">const entity = ecs.createEntity()
+ecs.addComponent(entity, Position, { x: 0, y: 0 })
+
+const destroyed = ecs.destroyEntity(entity)
+// destroyed = true
+
+// Components are also removed
+const pos = ecs.getComponent(entity, Position)
+// pos = null
+
+// Destroying non-existent entity
+const result = ecs.destroyEntity(&#39;does-not-exist&#39;)
+// result = false
+</code></pre>
+<hr>
+<h2>Types</h2>
+<h3><code>EntityId</code></h3>
+<pre><code class="language-typescript">type EntityId = string
+</code></pre>
+<p>Entity identifiers are strings. Auto-generated IDs use UUIDv7 format, which is:</p>
+<ul>
+<li>Time-sortable (earlier entities have lexicographically smaller IDs)</li>
+<li>Globally unique</li>
+<li>36 characters with hyphens: <code>xxxxxxxx-xxxx-7xxx-xxxx-xxxxxxxxxxxx</code></li>
+</ul>
+<p>Custom IDs can be any non-empty string.</p>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

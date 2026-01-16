@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transactions - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Transactions</h1>
+<p>Transactions let you make multiple changes atomically. Either all operations succeed, or they all roll back. This is essential when you need to update several entities or components together and can&#39;t have partial updates.</p>
+<h2>How It Works</h2>
+<p>The ECS wraps your operations in a database transaction. If any operation throws an error, the entire transaction rolls back - the database returns to its state before the transaction started.</p>
+<pre><code>Transaction Start
+    │
+    ├── createEntity()     ✓
+    ├── addComponent()     ✓
+    ├── updateComponent()  ✗ Error!
+    │
+    ▼
+Rollback: entity and component additions are undone
+</code></pre>
+<h2>Basic Usage</h2>
+<pre><code class="language-typescript">await ecs.transaction(async (ecs) =&gt; {
+  const entity = ecs.createEntity()
+  ecs.addComponent(entity, Position, { x: 0, y: 0 })
+  ecs.addComponent(entity, Health, { current: 100, max: 100 })
+  // If any of these fail, all are rolled back
+})
+</code></pre>
+<h2>Key Points</h2>
+<ul>
+<li><p><strong>Automatic rollback</strong> - Any error inside the callback triggers a rollback</p>
+</li>
+<li><p><strong>Callback receives ECS</strong> - Use the ECS instance passed to the callback for operations</p>
+</li>
+<li><p><strong>Async/await</strong> - The transaction method is async, as is the callback</p>
+</li>
+<li><p><strong>Return values</strong> - You can return a value from the transaction callback</p>
+</li>
+<li><p><strong>Nested transactions</strong> - Supported by the underlying database (SQLite savepoints)</p>
+</li>
+</ul>
+<h2>Examples</h2>
+<h3>Atomic Entity Creation</h3>
+<p>Create an entity that must have all its components or none:</p>
+<pre><code class="language-typescript">await ecs.transaction(async (ecs) =&gt; {
+  const player = ecs.createEntity(&#39;player&#39;)
+  ecs.addComponent(player, Position, { x: 0, y: 0 })
+  ecs.addComponent(player, Health, { current: 100, max: 100 })
+  ecs.addComponent(player, Inventory, { capacity: 20, items: [] })
+  // If any addComponent fails, player entity is also rolled back
+})
+</code></pre>
+<h3>Transferring Resources</h3>
+<p>Move items between two entities atomically:</p>
+<pre><code class="language-typescript">await ecs.transaction(async (ecs) =&gt; {
+  const senderInv = ecs.getComponent(sender, Inventory)
+  const receiverInv = ecs.getComponent(receiver, Inventory)
+
+  if (!senderInv || !receiverInv) {
+    throw new Error(&#39;Missing inventory&#39;)
+  }
+
+  // Remove from sender
+  const newSenderItems = senderInv.items.filter(i =&gt; i.id !== itemId)
+  ecs.updateComponent(sender, Inventory, { items: newSenderItems })
+
+  // Add to receiver
+  const item = senderInv.items.find(i =&gt; i.id === itemId)
+  const newReceiverItems = [...receiverInv.items, item]
+  ecs.updateComponent(receiver, Inventory, { items: newReceiverItems })
+
+  // If either update fails, both are rolled back
+})
+</code></pre>
+<h3>Returning Values</h3>
+<pre><code class="language-typescript">const newEntityId = await ecs.transaction(async (ecs) =&gt; {
+  const entity = ecs.createEntity()
+  ecs.addComponent(entity, Position, { x: 0, y: 0 })
+  return entity  // Return the created ID
+})
+
+console.log(`Created: ${newEntityId}`)
+</code></pre>
+<h3>Intentional Rollback</h3>
+<pre><code class="language-typescript">await ecs.transaction(async (ecs) =&gt; {
+  const entity = ecs.createEntity()
+  ecs.addComponent(entity, Position, { x: 0, y: 0 })
+
+  // Check some condition
+  const entities = ecs.query([Position])
+  if (entities.length &gt; 1000) {
+    throw new Error(&#39;Too many entities&#39;)  // Rollback
+  }
+})
+</code></pre>
+<h2>Related</h2>
+<ul>
+<li><strong><a href="guide-using-transactions.html">Using Transactions</a></strong> - More patterns and use cases</li>
+<li><strong><a href="concept-entities.html">Entities</a></strong> - What gets created/destroyed in transactions</li>
+<li><strong><a href="concept-components.html">Components</a></strong> - What gets added/updated/removed in transactions</li>
+<li><strong><a href="api-advanced.html">Advanced API</a></strong> - transaction() reference</li>
+</ul>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

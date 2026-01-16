@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Optimizing with Indexes - @motioneffector/ecs</title>
+  <link rel="stylesheet" href="../demo-files/demo.css">
+  <link rel="stylesheet" href="manual.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="header-title">@motioneffector/ecs</h1>
+      <p class="header-description">Documentation</p>
+      <nav class="header-links">
+        <a href="../index.html" class="header-link">Demo</a>
+        <a href="https://www.npmjs.com/package/@motioneffector/ecs" class="header-link">npm</a>
+        <a href="https://github.com/motioneffector/ecs" class="header-link">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="manual-layout">
+      <aside class="manual-sidebar">
+        <nav class="sidebar-nav">
+<p><strong><a href="index.html">@motioneffector/ecs</a></strong></p>
+<p><strong>Getting Started</strong></p>
+<ul>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="your-first-ecs.html">Your First ECS</a></li>
+</ul>
+<p><strong>Core Concepts</strong></p>
+<ul>
+<li><a href="concept-components.html">Components</a></li>
+<li><a href="concept-entities.html">Entities</a></li>
+<li><a href="concept-queries.html">Queries</a></li>
+<li><a href="concept-events.html">Events</a></li>
+<li><a href="concept-transactions.html">Transactions</a></li>
+</ul>
+<p><strong>Guides</strong></p>
+<ul>
+<li><a href="guide-working-with-events.html">Working with Events</a></li>
+<li><a href="guide-using-transactions.html">Using Transactions</a></li>
+<li><a href="guide-using-archetypes.html">Using Archetypes</a></li>
+<li><a href="guide-optimizing-with-indexes.html">Optimizing with Indexes</a></li>
+</ul>
+<p><strong>API Reference</strong></p>
+<ul>
+<li><a href="api-component-definition.html">Component Definition</a></li>
+<li><a href="api-ecs-core.html">ECS Core</a></li>
+<li><a href="api-entities.html">Entities</a></li>
+<li><a href="api-component-operations.html">Component Operations</a></li>
+<li><a href="api-queries.html">Queries</a></li>
+<li><a href="api-events.html">Events</a></li>
+<li><a href="api-advanced.html">Advanced</a></li>
+</ul>
+
+        </nav>
+      </aside>
+
+      <main class="manual-content">
+        <article class="manual-article">
+<h1>Optimizing with Indexes</h1>
+<p>This guide shows you how to add database indexes to speed up queries on frequently-accessed component fields.</p>
+<h2>Prerequisites</h2>
+<p>Before starting, you should:</p>
+<ul>
+<li><a href="concept-queries.html">Understand how queries work</a></li>
+<li>Have an ECS with components that you query frequently</li>
+</ul>
+<h2>Overview</h2>
+<p>We&#39;ll cover:</p>
+<ol>
+<li>Understanding when indexes help</li>
+<li>Adding indexes to component fields</li>
+<li>Measuring performance improvements</li>
+</ol>
+<h2>Step 1: Understand When Indexes Help</h2>
+<p>Indexes speed up queries that filter by specific field values. They&#39;re most useful when:</p>
+<ul>
+<li>You have many entities with a component (thousands+)</li>
+<li>You frequently filter by a specific field</li>
+<li>The field has varied values (not just true/false)</li>
+</ul>
+<pre><code class="language-typescript">// Without index: scans all Position components
+const nearbyEntities = ecs.query([Position], {
+  filter: (pos) =&gt; pos.x &gt;= 100 &amp;&amp; pos.x &lt;= 200
+})
+
+// With index on &#39;x&#39;: database can quickly find matching rows
+</code></pre>
+<h2>Step 2: Add Indexes</h2>
+<p>Use <code>addIndex</code> after initializing the ECS:</p>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+const Position = defineComponent(&#39;Position&#39;, {
+  x: &#39;number&#39;,
+  y: &#39;number&#39;,
+  room: &#39;string&#39;
+})
+
+const db = await createDatabase()
+const ecs = createECS(db, [Position])
+await ecs.initialize()
+
+// Add indexes on frequently-queried fields
+ecs.addIndex(Position, &#39;x&#39;)
+ecs.addIndex(Position, &#39;y&#39;)
+ecs.addIndex(Position, &#39;room&#39;)
+</code></pre>
+<p>The index is created on the component&#39;s database table. You only need to add each index once.</p>
+<h2>Step 3: Measure Performance</h2>
+<p>Test with realistic data volumes to see the difference:</p>
+<pre><code class="language-typescript">// Create many entities
+for (let i = 0; i &lt; 10000; i++) {
+  const entity = ecs.createEntity()
+  ecs.addComponent(entity, Position, {
+    x: Math.random() * 1000,
+    y: Math.random() * 1000,
+    room: `room-${Math.floor(Math.random() * 100)}`
+  })
+}
+
+// Query without index (before adding)
+console.time(&#39;query-no-index&#39;)
+const results1 = ecs.rawQuery(
+  `SELECT entity_id FROM &quot;component_Position&quot; WHERE room = ?`,
+  [&#39;room-42&#39;]
+)
+console.timeEnd(&#39;query-no-index&#39;)
+
+// Add index
+ecs.addIndex(Position, &#39;room&#39;)
+
+// Query with index
+console.time(&#39;query-with-index&#39;)
+const results2 = ecs.rawQuery(
+  `SELECT entity_id FROM &quot;component_Position&quot; WHERE room = ?`,
+  [&#39;room-42&#39;]
+)
+console.timeEnd(&#39;query-with-index&#39;)
+</code></pre>
+<h2>Complete Example</h2>
+<pre><code class="language-typescript">import { createECS, defineComponent } from &#39;@motioneffector/ecs&#39;
+import { createDatabase } from &#39;@motioneffector/sql&#39;
+
+const Position = defineComponent(&#39;Position&#39;, { x: &#39;number&#39;, y: &#39;number&#39; })
+const Team = defineComponent(&#39;Team&#39;, { name: &#39;string&#39; })
+const Health = defineComponent(&#39;Health&#39;, { current: &#39;number&#39;, max: &#39;number&#39; })
+
+const db = await createDatabase()
+const ecs = createECS(db, [Position, Team, Health])
+await ecs.initialize()
+
+// Add indexes on fields we&#39;ll query frequently
+ecs.addIndex(Team, &#39;name&#39;)      // For &quot;find all enemies&quot; queries
+ecs.addIndex(Health, &#39;current&#39;) // For &quot;find low health entities&quot; queries
+
+// Create test data
+for (let i = 0; i &lt; 5000; i++) {
+  const entity = ecs.createEntity()
+  ecs.addComponent(entity, Position, {
+    x: Math.random() * 1000,
+    y: Math.random() * 1000
+  })
+  ecs.addComponent(entity, Team, {
+    name: Math.random() &gt; 0.5 ? &#39;player&#39; : &#39;enemy&#39;
+  })
+  ecs.addComponent(entity, Health, {
+    current: Math.floor(Math.random() * 100),
+    max: 100
+  })
+}
+
+// These queries benefit from indexes
+const enemies = ecs.rawQuery&lt;{ entity_id: string }&gt;(
+  `SELECT entity_id FROM &quot;component_Team&quot; WHERE name = ?`,
+  [&#39;enemy&#39;]
+)
+console.log(`Found ${enemies.length} enemies`)
+
+const lowHealth = ecs.rawQuery&lt;{ entity_id: string }&gt;(
+  `SELECT entity_id FROM &quot;component_Health&quot; WHERE current &lt; ?`,
+  [25]
+)
+console.log(`Found ${lowHealth.length} low health entities`)
+</code></pre>
+<h2>Variations</h2>
+<h3>Composite Queries with Indexes</h3>
+<p>When filtering on multiple fields, indexes on each field help:</p>
+<pre><code class="language-typescript">ecs.addIndex(Position, &#39;x&#39;)
+ecs.addIndex(Position, &#39;y&#39;)
+
+// Both indexes can help with range queries
+const inArea = ecs.rawQuery&lt;{ entity_id: string }&gt;(
+  `SELECT entity_id FROM &quot;component_Position&quot;
+   WHERE x &gt;= ? AND x &lt;= ? AND y &gt;= ? AND y &lt;= ?`,
+  [100, 200, 100, 200]
+)
+</code></pre>
+<h3>Index on Join Fields</h3>
+<p>For complex multi-component queries, indexes help the joins:</p>
+<pre><code class="language-typescript">// entity_id is already indexed (it&#39;s the primary key)
+// but additional field indexes help filter conditions
+
+const damagedEnemies = ecs.rawQuery&lt;{ entity_id: string }&gt;(
+  `SELECT t.entity_id
+   FROM &quot;component_Team&quot; t
+   JOIN &quot;component_Health&quot; h ON t.entity_id = h.entity_id
+   WHERE t.name = ? AND h.current &lt; h.max`,
+  [&#39;enemy&#39;]
+)
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>No Performance Improvement</h3>
+<p><strong>Symptom:</strong> Query time is similar with and without index.</p>
+<p><strong>Cause:</strong> Small data set, or query doesn&#39;t filter on indexed field.</p>
+<p><strong>Solution:</strong> Indexes help most with large data sets (1000+ rows) and queries that filter on the indexed column.</p>
+<h3>Index Already Exists</h3>
+<p><strong>Symptom:</strong> Error when adding index.</p>
+<p><strong>Cause:</strong> Index was already added previously.</p>
+<p><strong>Solution:</strong> addIndex uses CREATE INDEX IF NOT EXISTS, so this shouldn&#39;t error. If it does, the field name might be invalid.</p>
+<h2>See Also</h2>
+<ul>
+<li><strong><a href="concept-queries.html">Queries Concept</a></strong> - Understanding query basics</li>
+<li><strong><a href="api-queries.html">Query API</a></strong> - query(), rawQuery() reference</li>
+<li><strong><a href="api-advanced.html">Advanced API</a></strong> - addIndex() reference</li>
+</ul>
+
+        </article>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
