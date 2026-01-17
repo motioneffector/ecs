@@ -212,6 +212,9 @@ const testRunner = {
   }
 }
 
+// Export testRunner globally for Playwright tests
+window.testRunner = testRunner
+
 // Wire up event listeners
 document.addEventListener('DOMContentLoaded', () => {
   const runButton = document.getElementById('run-all-tests')
