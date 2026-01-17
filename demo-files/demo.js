@@ -22,20 +22,20 @@ class MockDatabase {
   }
 
   exec(sql) {
-    // Handle CREATE TABLE statements
+    // Handle CREATE TABLE statements (handles both quoted and unquoted table names)
     if (sql.includes('CREATE TABLE')) {
-      const match = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
+      const match = sql.match(/CREATE TABLE IF NOT EXISTS "?(component_\w+)"?/)
       if (match) {
         const tableName = match[1]
-        if (tableName !== 'entities' && !this.componentTables.has(tableName)) {
+        if (!this.componentTables.has(tableName)) {
           this.componentTables.set(tableName, new Map())
         }
       }
     }
 
-    // Handle CREATE INDEX
+    // Handle CREATE INDEX (handles quoted identifiers)
     if (sql.includes('CREATE INDEX')) {
-      const match = sql.match(/CREATE INDEX IF NOT EXISTS (\w+) ON (\w+) \((\w+)\)/)
+      const match = sql.match(/CREATE INDEX IF NOT EXISTS "?(\w+)"? ON "?(\w+)"? \("?(\w+)"?\)/)
       if (match) {
         const [, indexName, tableName, fieldName] = match
         if (!this.indices.has(tableName)) {
@@ -54,15 +54,16 @@ class MockDatabase {
       return { changes: 1, lastInsertRowId: 1 }
     }
 
-    // INSERT INTO component table
-    if (sql.includes('INSERT INTO component_')) {
-      const match = sql.match(/INSERT INTO (component_\w+)/)
+    // INSERT INTO component table (handles quoted table names)
+    if (sql.includes('INSERT INTO') && sql.includes('component_')) {
+      const match = sql.match(/INSERT INTO "?(component_\w+)"?/)
       if (match) {
         const tableName = match[1]
         const table = this.componentTables.get(tableName)
         const fieldMatch = sql.match(/\(([^)]+)\) VALUES/)
-        if (fieldMatch) {
-          const fields = fieldMatch[1].split(',').map(f => f.trim())
+        if (fieldMatch && table) {
+          // Strip double quotes from SQL identifiers (e.g., "field_name" -> field_name)
+          const fields = fieldMatch[1].split(',').map(f => f.trim().replace(/^"|"$/g, ''))
           const data = {}
           fields.forEach((field, i) => {
             data[field] = params[i]
@@ -85,36 +86,41 @@ class MockDatabase {
       return { changes: existed ? 1 : 0 }
     }
 
-    // DELETE FROM component table
-    if (sql.includes('DELETE FROM component_')) {
-      const match = sql.match(/DELETE FROM (component_\w+)/)
+    // DELETE FROM component table (handles quoted table names)
+    if (sql.includes('DELETE FROM') && sql.includes('component_')) {
+      const match = sql.match(/DELETE FROM "?(component_\w+)"?/)
       if (match) {
         const tableName = match[1]
         const table = this.componentTables.get(tableName)
-        const entityId = params[0]
-        const existed = table.has(entityId)
-        table.delete(entityId)
-        return { changes: existed ? 1 : 0 }
+        if (table) {
+          const entityId = params[0]
+          const existed = table.has(entityId)
+          table.delete(entityId)
+          return { changes: existed ? 1 : 0 }
+        }
       }
     }
 
-    // UPDATE component table
-    if (sql.includes('UPDATE component_')) {
-      const match = sql.match(/UPDATE (component_\w+) SET (.+) WHERE/)
+    // UPDATE component table (handles quoted table names)
+    if (sql.includes('UPDATE') && sql.includes('component_')) {
+      const match = sql.match(/UPDATE "?(component_\w+)"? SET (.+) WHERE/)
       if (match) {
         const tableName = match[1]
         const setClause = match[2]
-        const fields = setClause.split(',').map(s => s.trim().split('=')[0].trim())
+        // Strip double quotes from SQL identifiers
+        const fields = setClause.split(',').map(s => s.trim().split('=')[0].trim().replace(/^"|"$/g, ''))
         const table = this.componentTables.get(tableName)
-        const entityId = params[params.length - 1]
-        const existing = table.get(entityId)
-        if (existing) {
-          const updated = { ...existing }
-          fields.forEach((field, i) => {
-            updated[field] = params[i]
-          })
-          table.set(entityId, updated)
-          return { changes: 1 }
+        if (table) {
+          const entityId = params[params.length - 1]
+          const existing = table.get(entityId)
+          if (existing) {
+            const updated = { ...existing }
+            fields.forEach((field, i) => {
+              updated[field] = params[i]
+            })
+            table.set(entityId, updated)
+            return { changes: 1 }
+          }
         }
       }
     }
@@ -129,9 +135,9 @@ class MockDatabase {
       return this.entities.get(id)
     }
 
-    // SELECT from component table
-    if (sql.includes('SELECT * FROM component_')) {
-      const match = sql.match(/SELECT \* FROM (component_\w+)/)
+    // SELECT from component table (handles quoted table names)
+    if (sql.includes('SELECT * FROM') && sql.includes('component_')) {
+      const match = sql.match(/SELECT \* FROM "?(component_\w+)"?/)
       if (match) {
         const tableName = match[1]
         const table = this.componentTables.get(tableName)
@@ -149,20 +155,24 @@ class MockDatabase {
       return Array.from(this.entities.values())
     }
 
-    // SELECT from component table for query
-    if (sql.includes('SELECT') && sql.includes('entity_id FROM component_')) {
-      // Parse the query to extract table joins
-      const tableMatches = [...sql.matchAll(/component_\w+/g)]
-      if (tableMatches.length === 1) {
+    // SELECT from component table for query (handles quoted table and column names)
+    // Pattern: SELECT t0."entity_id" FROM "component_X" t0 INNER JOIN "component_Y" t1 ...
+    if (sql.includes('SELECT') && sql.includes('entity_id') && sql.includes('component_')) {
+      // Parse the query to extract table joins (handles quoted table names)
+      const tableMatches = [...sql.matchAll(/"?(component_\w+)"?/g)]
+      // Filter to unique table names
+      const uniqueTables = [...new Set(tableMatches.map(m => m[1]))]
+
+      if (uniqueTables.length === 1) {
         // Single component query
-        const tableName = tableMatches[0][0]
+        const tableName = uniqueTables[0]
         const table = this.componentTables.get(tableName)
         if (table) {
           return Array.from(table.keys()).map(entityId => ({ entity_id: entityId }))
         }
-      } else if (tableMatches.length > 1) {
+      } else if (uniqueTables.length > 1) {
         // Multi-component query (INNER JOIN)
-        const tables = tableMatches.map(m => this.componentTables.get(m[0]))
+        const tables = uniqueTables.map(name => this.componentTables.get(name))
         const firstTable = tables[0]
         if (!firstTable) return []
 
@@ -174,18 +184,6 @@ class MockDatabase {
           }
         }
         return result
-      }
-    }
-
-    // SELECT entity_id from specific component table
-    if (sql.includes('SELECT entity_id FROM component_')) {
-      const match = sql.match(/SELECT entity_id FROM (component_\w+)/)
-      if (match) {
-        const tableName = match[1]
-        const table = this.componentTables.get(tableName)
-        if (table) {
-          return Array.from(table.keys()).map(entityId => ({ entity_id: entityId }))
-        }
       }
     }
 
