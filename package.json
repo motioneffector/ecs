@@ -1,6 +1,6 @@
 {
   "name": "@motioneffector/ecs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SQL-backed Entity Component System for persistent, queryable game entities",
   "author": "motioneffector",
   "license": "MIT",

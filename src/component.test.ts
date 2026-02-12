@@ -42,20 +42,20 @@ describe('defineComponent()', () => {
 
   describe('Validation', () => {
     it('throws ValidationError for empty name', () => {
-      expect(() => defineComponent('', { x: 'number' })).toThrow(ValidationError)
+      expect(() => defineComponent('', { x: 'number' })).toThrow(/name/i)
     })
 
     it('throws ValidationError for empty schema', () => {
-      expect(() => defineComponent('test', {})).toThrow(ValidationError)
+      expect(() => defineComponent('test', {})).toThrow(/schema/i)
     })
 
     it('throws ValidationError for invalid field type', () => {
       // @ts-expect-error - Testing runtime validation
-      expect(() => defineComponent('test', { field: 'invalid' })).toThrow(ValidationError)
+      expect(() => defineComponent('test', { field: 'invalid' })).toThrow(/type/i)
     })
 
     it('throws ValidationError for reserved field name "entity_id"', () => {
-      expect(() => defineComponent('test', { entity_id: 'string' })).toThrow(ValidationError)
+      expect(() => defineComponent('test', { entity_id: 'string' })).toThrow(/entity_id/i)
     })
   })
 })

@@ -120,7 +120,11 @@ export function createECS(
 
   function deserializeValue(value: unknown, fieldType: string): unknown {
     if (fieldType === 'json' && typeof value === 'string') {
-      return JSON.parse(value)
+      try {
+        return JSON.parse(value)
+      } catch {
+        throw new DatabaseError(`Failed to parse JSON value: ${value}`)
+      }
     }
     if (fieldType === 'boolean') {
       return value === 1
@@ -207,6 +211,19 @@ export function createECS(
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function runHandlers(handlers: Array<(...args: any[]) => void>, ...args: unknown[]): Error[] {
+    const errors: Error[] = []
+    for (const handler of handlers) {
+      try {
+        handler(...args)
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+    return errors
+  }
+
   function entityExists(entityId: EntityId): boolean {
     const result = database.get<{ id: string }>(
       'SELECT id FROM entities WHERE id = ?',
@@ -289,15 +306,8 @@ export function createECS(
       const timestamp = Date.now()
       database.run('INSERT INTO entities (id, created_at) VALUES (?, ?)', [id, timestamp])
 
-      // Fire entity created event
-      for (const handler of entityCreatedHandlers) {
-        try {
-          handler(id)
-        } catch (error) {
-          // Log error but don't throw - event handlers should not corrupt state
-          console.error('Error in onEntityCreated handler:', error)
-        }
-      }
+      // Fire entity created event - all handlers run even if one throws
+      runHandlers(entityCreatedHandlers, id)
 
       return id
     },
@@ -315,30 +325,18 @@ export function createECS(
         }
       }
 
-      // Fire component removed events
+      // Fire component removed events - all handlers run even if one throws
       for (const component of componentsToRemove) {
         const handlers = componentRemovedHandlers.get(component.name) ?? []
-        for (const handler of handlers) {
-          try {
-            handler(entityId)
-          } catch (error) {
-            console.error('Error in onComponentRemoved handler:', error)
-          }
-        }
+        runHandlers(handlers, entityId)
       }
 
       // Delete entity (CASCADE will delete components)
       const result = database.run('DELETE FROM entities WHERE id = ?', [entityId])
 
-      // Fire entity destroyed event
+      // Fire entity destroyed event - all handlers run even if one throws
       if (result.changes > 0) {
-        for (const handler of entityDestroyedHandlers) {
-          try {
-            handler(entityId)
-          } catch (error) {
-            console.error('Error in onEntityDestroyed handler:', error)
-          }
-        }
+        runHandlers(entityDestroyedHandlers, entityId)
         return true
       }
 
@@ -386,13 +384,7 @@ export function createECS(
       )
 
       const handlers = componentAddedHandlers.get(component.name) ?? []
-      for (const handler of handlers) {
-        try {
-          handler(entityId, data)
-        } catch (error) {
-          console.error('Error in onComponentAdded handler:', error)
-        }
-      }
+      runHandlers(handlers, entityId, data)
 
       return entityId
     },
@@ -469,13 +461,7 @@ export function createECS(
       }
 
       const handlers = componentUpdatedHandlers.get(component.name) ?? []
-      for (const handler of handlers) {
-        try {
-          handler(entityId, oldData, newData)
-        } catch (error) {
-          console.error('Error in onComponentUpdated handler:', error)
-        }
-      }
+      runHandlers(handlers, entityId, oldData, newData)
 
       return entityId
     },
@@ -495,13 +481,7 @@ export function createECS(
 
       if (hadComponent) {
         const handlers = componentRemovedHandlers.get(component.name) ?? []
-        for (const handler of handlers) {
-          try {
-            handler(entityId)
-          } catch (error) {
-            console.error('Error in onComponentRemoved handler:', error)
-          }
-        }
+        runHandlers(handlers, entityId)
       }
 
       return entityId
