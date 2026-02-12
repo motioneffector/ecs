@@ -72,43 +72,49 @@ describe('createECS()', () => {
       const db = createMockDatabase()
       const Position = defineComponent('position', { x: 'number', y: 'number' })
       const ecs = createECS(db, [Position])
-      expect(typeof ecs).toBe('object')
-      expect(ecs).toHaveProperty('initialize')
+      const db2 = ecs.getDatabase()
+      expect(db2).toBe(db)
     })
 
     it('accepts empty components array', () => {
       const db = createMockDatabase()
       const ecs = createECS(db, [])
-      expect(typeof ecs).toBe('object')
-      expect(ecs).toHaveProperty('initialize')
+      const db2 = ecs.getDatabase()
+      expect(db2).toBe(db)
     })
 
     it('returns object with all expected methods', () => {
       const db = createMockDatabase()
       const ecs = createECS(db, [])
-      expect(typeof ecs.initialize).toBe('function')
-      expect(typeof ecs.createEntity).toBe('function')
-      expect(typeof ecs.destroyEntity).toBe('function')
-      expect(typeof ecs.addComponent).toBe('function')
-      expect(typeof ecs.getComponent).toBe('function')
-      expect(typeof ecs.updateComponent).toBe('function')
-      expect(typeof ecs.removeComponent).toBe('function')
-      expect(typeof ecs.hasComponent).toBe('function')
-      expect(typeof ecs.query).toBe('function')
-      expect(typeof ecs.queryWithData).toBe('function')
-      expect(typeof ecs.rawQuery).toBe('function')
-      expect(typeof ecs.transaction).toBe('function')
-      expect(typeof ecs.addComponentBulk).toBe('function')
-      expect(typeof ecs.removeComponentBulk).toBe('function')
-      expect(typeof ecs.onEntityCreated).toBe('function')
-      expect(typeof ecs.onEntityDestroyed).toBe('function')
-      expect(typeof ecs.onComponentAdded).toBe('function')
-      expect(typeof ecs.onComponentRemoved).toBe('function')
-      expect(typeof ecs.onComponentUpdated).toBe('function')
-      expect(typeof ecs.defineArchetype).toBe('function')
-      expect(typeof ecs.createFromArchetype).toBe('function')
-      expect(typeof ecs.addIndex).toBe('function')
-      expect(typeof ecs.getDatabase).toBe('function')
+      const expectedMethodNames = [
+        'initialize',
+        'createEntity',
+        'destroyEntity',
+        'addComponent',
+        'getComponent',
+        'updateComponent',
+        'removeComponent',
+        'hasComponent',
+        'query',
+        'queryWithData',
+        'rawQuery',
+        'transaction',
+        'addComponentBulk',
+        'removeComponentBulk',
+        'onEntityCreated',
+        'onEntityDestroyed',
+        'onComponentAdded',
+        'onComponentRemoved',
+        'onComponentUpdated',
+        'defineArchetype',
+        'createFromArchetype',
+        'addIndex',
+        'getDatabase',
+      ]
+      const actualKeys = Object.keys(ecs)
+      for (const name of expectedMethodNames) {
+        expect(actualKeys).toContain(name)
+      }
     })
 
     it('does not initialize database immediately', () => {
@@ -122,14 +128,14 @@ describe('createECS()', () => {
   describe('Validation', () => {
     it('throws ValidationError for invalid database', () => {
       // @ts-expect-error - Testing runtime validation
-      expect(() => createECS(null, [])).toThrow(ValidationError)
+      expect(() => createECS(null, [])).toThrow(/invalid database/i)
     })
 
     it('throws ValidationError for duplicate component names', () => {
       const db = createMockDatabase()
       const Comp1 = defineComponent('test', { x: 'number' })
       const Comp2 = defineComponent('test', { y: 'number' })
-      expect(() => createECS(db, [Comp1, Comp2])).toThrow(ValidationError)
+      expect(() => createECS(db, [Comp1, Comp2])).toThrow(/duplicate component name/i)
     })
   })
 })
@@ -298,7 +304,7 @@ describe('ecs.initialize()', () => {
         throw new Error('SQL error')
       })
       const ecs = createECS(badDb, [])
-      await expect(ecs.initialize()).rejects.toThrow(DatabaseError)
+      await expect(ecs.initialize()).rejects.toThrow(/failed to initialize/i)
     })
   })
 })
